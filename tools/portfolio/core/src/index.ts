@@ -11,6 +11,15 @@ export {
   // main entry
   analyse,
   deriveFindings,
+  // input validation — the catchable error `analyse` refuses with, and the
+  // benchmark window that decides two of its four codes
+  AnalysisError,
+  benchmarkCoverage,
+  // data quality — the classifier and the warning copy, exported so a UI can
+  // recompute both after the user edits the review table
+  classifyGranularity,
+  dataQualityWarnings,
+  GRANULARITY_MAX_INTERVAL,
   // market weight (derived, not sourced — see engine.ts)
   impliedUsMarketWeight,
   FALLBACK_US_MARKET_WEIGHT,
@@ -32,6 +41,7 @@ export {
 } from './engine';
 
 export type {
+  AnalysisErrorCode,
   InputRow,
   Holding,
   PortfolioInput,
@@ -39,6 +49,8 @@ export type {
   StrategyDef,
   StrategyResult,
   PeriodInfo,
+  Granularity,
+  DataQuality,
   Finding,
   MarketWeight,
   AnalysisResult,
