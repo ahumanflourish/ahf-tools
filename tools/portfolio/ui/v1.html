@@ -53,15 +53,27 @@
   --text-control: 12px;
   --text-body: 16px;
   --leading-display: 1.15;
-  --text-h1: clamp(34px, 5vw, 52px);
-  --text-h2: 26px;
-  --text-h3: 20px;
+  --text-h1: clamp(24px, 3vw, 30px);
+  --text-h2: 20px;
+  --text-h3: 18px;
+  /* Reserved for a single large tabular figure. Never for words. */
+  --text-figure: clamp(36px, 5vw, 48px);
+
+  /* Layout — the picker column. Narrows with the viewport so the plot keeps
+     enough width to stay readable beside it. */
+  --rail: clamp(248px, 25vw, 320px);
 
   /* Chart — series identity. Two categorical slots, validated against the
      cream surface. Neither carries a shipped state meaning. */
   --series-you: var(--dusty-blue);
-  --series-ref: var(--deep-green);
+  --series-1: var(--deep-green);
+  --series-2: var(--sage);
+  --series-3: var(--bark);
   --grid: var(--line-soft);
+  /* Money in is context, not a competitor: it takes none of the four
+     categorical slots, so it is a stone hairline over a wash of the same. */
+  --floor-line: color-mix(in oklab, var(--subtle) 74%, transparent);
+  --floor-fill: color-mix(in oklab, var(--subtle) 13%, transparent);
 }
 
 * { box-sizing: border-box; }
@@ -93,30 +105,24 @@ body {
 }
 
 .page {
-  max-width: 1120px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 48px 40px 88px;
+  padding: 30px 40px 88px;
 }
 
-.masthead { margin-bottom: 56px; }
+/* The title sits close to the mark rather than under a tall stacked header:
+   the chart and its control have to clear the fold together. */
+.masthead { margin-bottom: 16px; }
 
-.head { margin-bottom: 32px; }
-.head .label { margin-bottom: 14px; }
-h1.display { font-size: var(--text-h1); max-width: 25ch; }
+.head { margin-bottom: 18px; }
+h1.display { font-size: var(--text-h1); max-width: 30ch; color: var(--accent); }
 .lede {
-  margin: 16px 0 0;
-  max-width: 62ch;
+  margin: 9px 0 0;
+  max-width: 74ch;
   color: var(--muted);
-  font-size: 17px;
+  font-size: 16px;
 }
 .lede strong { font-weight: 600; color: var(--ink); }
-.explainer {
-  margin: 10px 0 0;
-  max-width: 62ch;
-  color: var(--subtle);
-  font-size: 14px;
-  line-height: 1.55;
-}
 
 /* Card — solid outer border, dashed inner 3px in */
 .card {
@@ -134,6 +140,42 @@ h1.display { font-size: var(--text-h1); max-width: 25ch; }
   transition: border-color var(--slow) var(--ease);
 }
 
+/* ── Chart and picker as one unit ───────────────────────────────────────
+   The picker sits beside the plot at desk widths and directly beneath it on a
+   phone. A checkbox and the line it draws are never on different screens. */
+.chart-layout {
+  display: grid;
+  grid-template-areas: "head" "caut" "plot" "rail" "foot";
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: 28px;
+}
+.chart-head { grid-area: head; }
+.cautions   { grid-area: caut; }
+.plot-wrap  { grid-area: plot; }
+.rail       { grid-area: rail; }
+.chart-foot { grid-area: foot; }
+
+.rail {
+  margin-top: 22px; padding-top: 16px;
+  border-top: var(--border-thin) dotted var(--line);
+}
+@media (min-width: 1060px) {
+  .chart-layout {
+    grid-template-areas: "head rail" "caut rail" "plot rail" "foot rail" ".    rail";
+    grid-template-columns: minmax(0, 1fr) var(--rail);
+    /* The rail spans every row. The trailing flexible row absorbs whatever
+       height it has over the chart column, so the plot and its meta line stay
+       together at the top of the card instead of the slack being shared out
+       among them. */
+    grid-template-rows: auto auto auto auto 1fr;
+  }
+  .rail {
+    align-self: start; margin-top: 0; padding-top: 0;
+    border-top: 0; padding-left: 26px;
+    border-left: var(--border-thin) dotted var(--line);
+  }
+}
+
 .chart-head {
   display: flex; flex-wrap: wrap; align-items: flex-start;
   justify-content: space-between; gap: 16px 24px;
@@ -141,7 +183,7 @@ h1.display { font-size: var(--text-h1); max-width: 25ch; }
 }
 
 /* Legend — always present for two series */
-.legend { display: flex; flex-wrap: wrap; gap: 8px 26px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 24px; flex: 1 1 0; min-width: 0; }
 .legend-item {
   display: inline-flex; align-items: center; gap: 9px;
   font-size: var(--text-meta); font-weight: 600;
@@ -222,6 +264,18 @@ svg.chart:focus-visible { outline: var(--border-thick) dotted var(--accent); out
   display: flex; justify-content: space-between; gap: 12px;
 }
 .tip-diff span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
+/* Individual flows, named only here — the plot itself stays quiet. */
+.tip-flows {
+  margin-top: 8px; padding-top: 7px;
+  border-top: var(--border-thin) dotted var(--line);
+}
+.tip-flow {
+  display: flex; gap: 10px; justify-content: space-between;
+  font-size: var(--text-meta); line-height: 1.45; color: var(--muted);
+}
+.tip-flow + .tip-flow { margin-top: 2px; }
+.tip-flow b { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.tip-flow span { color: var(--subtle); white-space: nowrap; }
 
 .chart-foot {
   display: flex; flex-wrap: wrap; gap: 6px 18px;
@@ -284,11 +338,163 @@ a:hover { color: var(--accent); text-decoration-style: solid; }
   clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
 }
 
+/* ── The picker ─────────────────────────────────────────────────────────
+   Every explainer opens in place, beside the chart it changes. Nothing here
+   hides behind a hover: a row is open when it is chosen, when its + is
+   pressed, or when its checkbox takes focus. Cautions never close at all. */
+.rail-head { margin-bottom: 10px; }
+.rail-head .label, .rail-sub .label { margin-bottom: 7px; }
+.rail-note { margin: 0; font-size: var(--text-meta); line-height: 1.5; color: var(--muted); }
+.rail-sub {
+  margin-top: 15px; padding-top: 12px;
+  border-top: var(--border-thin) dotted var(--line-soft);
+}
+.rail-sub .label { margin-bottom: 0; }
+.slot-count {
+  display: block; margin: 8px 0 0;
+  font-size: var(--text-label); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-micro);
+  color: var(--subtle); font-variant-numeric: tabular-nums;
+}
+
+.refs { list-style: none; margin: 9px 0 0; padding: 0; }
+.ref {
+  padding: 7px 9px 8px; margin-bottom: 2px;
+  border: var(--border-thin) dotted transparent;
+  border-bottom-color: var(--line-soft);
+  transition: border-color var(--fast) var(--ease), background-color var(--fast) var(--ease);
+}
+.ref[data-state="on"] {
+  border: var(--border-normal) solid var(--ink);
+  background: color-mix(in oklab, var(--surface-raised) 70%, transparent);
+}
+.ref[data-state="blocked"] {
+  border-bottom-style: dashed; border-bottom-color: var(--line); opacity: 0.74;
+}
+
+.ref-line { display: flex; align-items: center; gap: 8px; }
+.ref-label {
+  display: flex; align-items: center; gap: 9px; cursor: pointer; margin: 0;
+  flex: 1 1 auto; min-width: 0;
+  font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.3;
+}
+.ref[data-state="blocked"] .ref-label { cursor: not-allowed; color: var(--subtle); }
+.ref-label input {
+  appearance: none; -webkit-appearance: none;
+  width: 15px; height: 15px; flex: none; margin: 0;
+  border: var(--border-normal) solid var(--line);
+  background: var(--surface); cursor: inherit;
+  transition: border-color var(--fast) var(--ease), background-color var(--fast) var(--ease);
+}
+.ref-label input:checked { border-color: var(--ink); background: var(--ink); }
+.ref-label input:disabled { border-style: dashed; }
+.ref-key { display: block; width: 28px; height: 10px; flex: none; }
+.ref-more {
+  flex: none; width: 20px; height: 20px; padding: 0; line-height: 1;
+  background: transparent; cursor: pointer; color: var(--muted);
+  border: var(--border-thin) dotted var(--line); border-radius: var(--radius);
+  font-family: inherit; font-size: var(--text-control); font-weight: 600;
+  transition: border-color var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.ref-more:hover { border-style: solid; color: var(--ink); }
+
+.ref-explainer {
+  display: none; margin: 7px 0 0 23px;
+  font-size: 12.5px; line-height: 1.45; color: var(--muted);
+}
+.ref[data-open="1"] .ref-explainer,
+.ref:has(.ref-label input:focus) .ref-explainer { display: block; }
+.ref-caution {
+  margin: 8px 0 0 23px; padding: 7px 9px;
+  border-left: var(--border-thick) solid var(--attention);
+  background: var(--attention-soft);
+  font-size: var(--text-meta); line-height: 1.45; color: var(--muted);
+}
+.ref-caution b {
+  display: block; font-weight: 600; color: var(--ink);
+  font-size: var(--text-micro); text-transform: uppercase;
+  letter-spacing: var(--tracking-micro); margin-bottom: 2px;
+}
+.ref-reason {
+  margin: 8px 0 0 23px;
+  font-size: var(--text-meta); line-height: 1.4; color: var(--subtle); font-style: italic;
+}
+
+/* ── The catalogue below — the same seven, described at length ─────────── */
+.catalogue { margin-top: 44px; }
+.catalogue .label { margin-bottom: 10px; }
+.cat-note { margin: 0 0 18px; max-width: 68ch; color: var(--muted); font-size: 14px; line-height: 1.55; }
+.cat-list {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 860px) { .cat-list { grid-template-columns: minmax(0, 1fr); } }
+.cat-item { border: var(--border-thin) dotted var(--line); padding: 14px 16px; }
+.cat-name { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); }
+.cat-explainer { margin: 7px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--muted); }
+.cat-caution {
+  margin: 10px 0 0; padding: 8px 10px;
+  border-left: var(--border-thick) solid var(--attention);
+  background: var(--attention-soft);
+  font-size: var(--text-meta); line-height: 1.5; color: var(--muted);
+}
+.cat-caution b {
+  display: block; font-weight: 600; color: var(--ink);
+  font-size: var(--text-label); text-transform: uppercase;
+  letter-spacing: var(--tracking-micro); margin-bottom: 3px;
+}
+.cat-reason { margin: 9px 0 0; font-size: var(--text-meta); line-height: 1.45; color: var(--subtle); font-style: italic; }
+
+/* Caution strip — sits with the chart, for as long as the strategy is on it.
+   Not dismissable: there is no control here to dismiss it with. */
+.cautions:not(:empty) { margin-bottom: 18px; }
+.caution-strip {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 10px 13px; margin-bottom: 10px;
+  border: var(--border-thin) dashed var(--attention);
+  background: var(--attention-soft);
+  font-size: 13px; line-height: 1.5; color: var(--muted);
+}
+.caution-strip:last-child { margin-bottom: 0; }
+.caution-strip svg { flex: none; margin-top: 5px; }
+.caution-strip b { font-weight: 600; color: var(--ink); }
+
+.legend-tag {
+  margin-left: 7px; padding: 1px 5px;
+  border: var(--border-thin) solid var(--attention);
+  color: var(--attention); font-size: var(--text-micro);
+  letter-spacing: var(--tracking-micro);
+}
+.legend-item.is-blank { color: var(--subtle); font-style: italic; text-transform: none; letter-spacing: 0; font-weight: 500; }
+
+.chart-actions { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+th.col-delta, td.col-delta { color: var(--muted); font-size: 12px; }
+th.col-start, td.col-start { border-left: var(--border-thin) dotted var(--line-soft); }
+.cap-note {
+  margin: 10px 0 0; padding: 8px 10px;
+  border: var(--border-thin) dotted var(--ink);
+  font-size: var(--text-meta); line-height: 1.45; color: var(--ink);
+}
+
 @media (max-width: 640px) {
+  /* Worst case here is a month with three references, money in and two flows.
+     Tighten the rhythm rather than dropping a row. */
+  .tip { padding: 9px 11px 10px; }
+  .tip-row { margin-top: 4px; }
+  .tip-val { font-size: 14px; }
+  .tip-flows { margin-top: 6px; padding-top: 5px; }
   .page { padding: 32px 20px 64px; }
   .card { padding: 20px 16px 18px; }
-  .masthead { margin-bottom: 36px; }
+  .masthead { margin-bottom: 14px; }
+  .cat-item { padding: 12px 13px; }
+  .ref { padding: 7px 6px 8px; }
+  .ref-explainer, .ref-reason, .ref-caution { margin-left: 0; }
 }
+
+/* The user drove the change, so the chart confirms it at the fast duration.
+   A deselection is meant to read as something they just did. */
+@keyframes chart-swap { from { opacity: 0.3; } to { opacity: 1; } }
+svg.chart.is-swap { animation: chart-swap var(--fast) var(--ease); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -308,10 +514,8 @@ a:hover { color: var(--accent); text-decoration-style: solid; }
   </div>
 
   <div class="head">
-    <p class="label">Portfolio vs. strategy</p>
     <h1 class="display">Portfolio value over time</h1>
-    <p class="lede">How your money actually tracked against just buying the boring thing — your balance against <strong id="ref-label">the reference strategy</strong>, same money in, same money out, same months.</p>
-    <p class="explainer" id="ref-explainer"></p>
+    <p class="lede" id="lede">How your money actually tracked against just buying the boring thing — your balance against <strong id="ref-label">the reference strategy</strong>, same money in, same money out, same months.</p>
   </div>
 
   <div id="dq-warning" hidden></div>
@@ -319,32 +523,65 @@ a:hover { color: var(--accent); text-decoration-style: solid; }
   <section class="card" aria-labelledby="chart-title">
     <h2 id="chart-title" class="visually-hidden">Portfolio value over time</h2>
 
-    <div class="chart-head">
-      <div class="legend" id="legend"></div>
-      <button type="button" class="choice" id="table-toggle" aria-pressed="false" aria-controls="table-view">Table view</button>
-    </div>
+    <div class="chart-layout">
 
-    <div class="plot-wrap" id="plot">
-      <div class="tip" id="tip" role="status" aria-live="polite"></div>
+      <div class="chart-head">
+        <div class="legend" id="legend"></div>
+        <div class="chart-actions">
+          <button type="button" class="choice" id="table-toggle" aria-pressed="false" aria-controls="table-view">Table view</button>
+        </div>
+      </div>
+
+      <div class="cautions" id="cautions" role="region" aria-label="Cautions on the strategies currently shown"></div>
+
+      <div class="plot-wrap" id="plot">
+        <div class="tip" id="tip" role="status" aria-live="polite"></div>
+      </div>
+
+      <div class="chart-foot" id="chart-foot"></div>
+
+      <!-- The picker. Beside the plot on a desk, directly under it on a phone,
+           inside the same card either way. -->
+      <div class="rail" id="picker" role="group" aria-labelledby="picker-title">
+        <div class="rail-head">
+          <p class="label" id="picker-title">Compare against</p>
+          <p class="rail-note">Your own line is always drawn. Add up to <strong>three</strong> references &mdash;
+            same money in, same money out, same months. Press <span aria-hidden="true">+</span> to read one before
+            you choose it; choosing it opens it too.</p>
+          <p class="slot-count" id="slot-count"></p>
+          <p class="cap-note" id="cap-note" hidden>All three reference slots are full. Three is the limit because
+            the brand palette holds four line colours that stay apart from one another, and your own line uses one
+            of them. Uncheck one to swap another in.</p>
+        </div>
+        <ul class="refs" id="refs" aria-labelledby="picker-title"></ul>
+
+        <div class="rail-sub">
+          <p class="label" id="context-title">Also on the chart</p>
+        </div>
+        <ul class="refs" id="context-list" aria-labelledby="context-title"></ul>
+      </div>
+
     </div>
 
     <p class="visually-hidden" id="chart-desc"></p>
 
-    <div class="chart-foot" id="chart-foot"></div>
-
     <div class="table-wrap" id="table-view" hidden>
       <table>
         <caption id="table-caption"></caption>
-        <thead><tr>
-          <th scope="col">Month</th>
-          <th scope="col">Your value</th>
-          <th scope="col" id="th-ref">Reference</th>
-          <th scope="col">Difference</th>
-        </tr></thead>
+        <thead><tr id="table-head"></tr></thead>
         <tbody id="table-body"></tbody>
       </table>
     </div>
   </section>
+
+  <section class="catalogue" aria-labelledby="cat-title">
+    <p class="label" id="cat-title">Every reference, in full</p>
+    <p class="cat-note">The same seven strategies, at length. Choosing happens beside the chart, where each one is
+      also described; this is here to read.</p>
+    <ul class="cat-list" id="cat-list"></ul>
+  </section>
+
+  <p class="visually-hidden" id="sel-live" role="status" aria-live="polite"></p>
 
   <div class="notes">
     <p class="label">Read this alongside it</p>
@@ -359,7 +596,16 @@ a:hover { color: var(--accent); text-decoration-style: solid; }
 </main>
 
 <script>
-const D = {"referenceId":"GLOBAL_EQUITY","referenceLabel":"Global stock market","referenceExplainer":"Every listed company in the world, weighted by size. The simplest possible 'do nothing' portfolio and the fairest yardstick for a stock-heavy strategy.","referenceCaution":null,"endingValue":53690.25,"referenceEndingValue":60328.4,"yourXirr":0.10054387101873885,"referenceXirr":0.13955446880793432,"netContributed":39500,"dataQuality":{"balanceCount":27,"flowCount":13,"granularity":"annual","firstDate":"2021-10-12","lastDate":"2026-07-31","warnings":[]},"months":["2021-10-31","2021-11-30","2021-12-31","2022-01-31","2022-02-28","2022-03-31","2022-04-30","2022-05-31","2022-06-30","2022-07-31","2022-08-31","2022-09-30","2022-10-31","2022-11-30","2022-12-31","2023-01-31","2023-02-28","2023-03-31","2023-04-30","2023-05-31","2023-06-30","2023-07-31","2023-08-31","2023-09-30","2023-10-31","2023-11-30","2023-12-31","2024-01-31","2024-02-29","2024-03-31","2024-04-30","2024-05-31","2024-06-30","2024-07-31","2024-08-31","2024-09-30","2024-10-31","2024-11-30","2024-12-31","2025-01-31","2025-02-28","2025-03-31","2025-04-30","2025-05-31","2025-06-30","2025-07-31","2025-08-31","2025-09-30","2025-10-31","2025-11-30","2025-12-31","2026-01-31","2026-02-28","2026-03-31","2026-04-30","2026-05-31","2026-06-30","2026-07-31"],"reference":[10254.27,15906.48,16512.52,15756.25,15319.8,15609.34,14344.99,14415.28,13244.76,14169.24,13595.39,12299.75,13084.47,14167.86,13538.81,17687.17,17124.71,17612.77,17862.87,17646.73,18672,19366.6,18816.59,18015,17488.97,19064.72,20048.46,20048.46,20948.64,21616.9,27225.6,28477.98,28930.78,29503.61,30191.04,30855.25,30182.6,32325.09,33098.82,36776.5,38372.13,43897.12,44142.95,46707.65,48888.9,49426.68,50889.71,52604.69,53667.31,53780.01,54274.78,55962.73,56880.52,53342.55,58308.74,60979.28,60747.56,60328.4],"observations":[{"date":"2021-10-31","value":10014.74},{"date":"2021-11-30","value":15879.92},{"date":"2021-12-31","value":16500.81},{"date":"2022-01-31","value":15596.22},{"date":"2022-09-30","value":12359.97},{"date":"2022-11-30","value":14081.32},{"date":"2022-12-31","value":13412.47},{"date":"2023-01-31","value":17664.31},{"date":"2023-09-30","value":17625.17},{"date":"2023-11-30","value":18475.94},{"date":"2023-12-31","value":19602.4},{"date":"2024-03-31","value":21061.89},{"date":"2024-04-30","value":26566.43},{"date":"2024-05-31","value":27628.75},{"date":"2024-09-30","value":29788.35},{"date":"2024-11-30","value":31754.24},{"date":"2024-12-31","value":32235.32},{"date":"2025-01-31","value":35835.11},{"date":"2025-02-28","value":37103.49},{"date":"2025-03-31","value":42405.47},{"date":"2025-09-30","value":49438.47},{"date":"2025-11-30","value":49986.41},{"date":"2025-12-31","value":50088.67},{"date":"2026-02-28","value":51915.09},{"date":"2026-03-31","value":50134.52},{"date":"2026-06-30","value":53969.84},{"date":"2026-07-31","value":53690.25}]};
+/* Computed by tools/portfolio/core analyse() over the reference fixture.
+   Every strategy path here comes out of one analyse() call — the engine
+   already computes all seven, so switching between them recomputes nothing. */
+const D = {"historyStart":"2021-10-12","historyEnd":"2026-07-31","endingValue":53690.25,"netContributed":39500,"yourXirr":0.10054387101873885,"defaultReferenceId":"GLOBAL_EQUITY","dataQuality":{"balanceCount":27,"flowCount":13,"granularity":"annual","firstDate":"2021-10-12","lastDate":"2026-07-31","warnings":[]},"months":["2021-10-31","2021-11-30","2021-12-31","2022-01-31","2022-02-28","2022-03-31","2022-04-30","2022-05-31","2022-06-30","2022-07-31","2022-08-31","2022-09-30","2022-10-31","2022-11-30","2022-12-31","2023-01-31","2023-02-28","2023-03-31","2023-04-30","2023-05-31","2023-06-30","2023-07-31","2023-08-31","2023-09-30","2023-10-31","2023-11-30","2023-12-31","2024-01-31","2024-02-29","2024-03-31","2024-04-30","2024-05-31","2024-06-30","2024-07-31","2024-08-31","2024-09-30","2024-10-31","2024-11-30","2024-12-31","2025-01-31","2025-02-28","2025-03-31","2025-04-30","2025-05-31","2025-06-30","2025-07-31","2025-08-31","2025-09-30","2025-10-31","2025-11-30","2025-12-31","2026-01-31","2026-02-28","2026-03-31","2026-04-30","2026-05-31","2026-06-30","2026-07-31"],"observations":[{"date":"2021-10-31","value":10014.74},{"date":"2021-11-30","value":15879.92},{"date":"2021-12-31","value":16500.81},{"date":"2022-01-31","value":15596.22},{"date":"2022-09-30","value":12359.97},{"date":"2022-11-30","value":14081.32},{"date":"2022-12-31","value":13412.47},{"date":"2023-01-31","value":17664.31},{"date":"2023-09-30","value":17625.17},{"date":"2023-11-30","value":18475.94},{"date":"2023-12-31","value":19602.4},{"date":"2024-03-31","value":21061.89},{"date":"2024-04-30","value":26566.43},{"date":"2024-05-31","value":27628.75},{"date":"2024-09-30","value":29788.35},{"date":"2024-11-30","value":31754.24},{"date":"2024-12-31","value":32235.32},{"date":"2025-01-31","value":35835.11},{"date":"2025-02-28","value":37103.49},{"date":"2025-03-31","value":42405.47},{"date":"2025-09-30","value":49438.47},{"date":"2025-11-30","value":49986.41},{"date":"2025-12-31","value":50088.67},{"date":"2026-02-28","value":51915.09},{"date":"2026-03-31","value":50134.52},{"date":"2026-06-30","value":53969.84},{"date":"2026-07-31","value":53690.25}],"inception":{"US_500":1976,"US_TOTAL":1992,"INTL_TOTAL":1996,"BOND_TOTAL":1986,"GLOBAL_EQUITY":2008,"TARGET_2060":2012},"monthlyStart":{"US_TOTAL":"2021-10","INTL_TOTAL":"2021-10","BOND_TOTAL":"2021-10","US_500":"2021-10","GLOBAL_EQUITY":"2021-10","TARGET_2060":"2021-10","CASH":"2021-10"},"strategies":[{"id":"GLOBAL_EQUITY","label":"Global stock market","explainer":"Every listed company in the world, weighted by size. The simplest possible 'do nothing' portfolio and the fairest yardstick for a stock-heavy strategy.","caution":null,"requiresAfter":null,"series":["GLOBAL_EQUITY"],"endingValue":60328.401081907454,"xirr":0.13955446880793432,"path":[10254.27,15906.48,16512.52,15756.25,15319.8,15609.34,14344.99,14415.28,13244.76,14169.24,13595.39,12299.75,13084.47,14167.86,13538.81,17687.17,17124.71,17612.77,17862.87,17646.73,18672,19366.6,18816.59,18015,17488.97,19064.72,20048.46,20048.46,20948.64,21616.9,27225.6,28477.98,28930.78,29503.61,30191.04,30855.25,30182.6,32325.09,33098.82,36776.5,38372.13,43897.12,44142.95,46707.65,48888.9,49426.68,50889.71,52604.69,53667.31,53780.01,54274.78,55962.73,56880.52,53342.55,58308.74,60979.28,60747.56,60328.4]},{"id":"GLOBAL_8020","label":"Global 80/20","explainer":"Global stocks with a fifth in bonds. A common setting for someone decades from retirement who still wants some cushion.","caution":null,"requiresAfter":null,"series":["GLOBAL_EQUITY","BOND_TOTAL"],"endingValue":56023.71275381106,"xirr":0.1147257983716764,"path":[10204.61,15929.89,16407.74,15738.96,15355.38,15498.17,14370.43,14450.94,13470.8,14275.71,13735.2,12582.88,13174.13,14137.12,13613.78,17637.13,17093.67,17575.2,17796.46,17582.83,18399.92,18954.47,18489.84,17761.93,17289.11,18702.74,19613.54,19607.26,20258.52,20814.37,26504.63,27577.55,27979.87,28552.88,29171.88,29766.71,29102.65,31036.15,31918.89,35397.06,37181.2,43036.03,43262.85,45199.57,47031.85,47426.22,48667.99,50102.54,50984.61,51127.6,51484.94,52788.54,53650.14,50782.82,54567.01,56622.51,56474.6,56023.71]},{"id":"GLOBAL_6040","label":"Global 60/40","explainer":"The classic balanced portfolio. Lower highs and shallower lows.","caution":null,"requiresAfter":null,"series":["GLOBAL_EQUITY","BOND_TOTAL"],"endingValue":51945.91171903132,"xirr":0.08957667779124023,"path":[10154.7,15953.87,16302.1,15719.79,15388.45,15386.33,14393.63,14484.2,13692.15,14378.92,13871.39,12860.72,13260.88,14104.86,13685.97,17582.79,17058.65,17533.47,17725.54,17514.51,18121.07,18534,18155.73,17502.42,17083.48,18333,19169.9,19157.63,19569.95,20017.53,25787.31,26684.9,27037.83,27610.7,28162.71,28689.64,28034.34,29763.59,30753.26,34043.81,36004.41,42171.71,42380.27,43720.48,45220.43,45478.63,46509.6,47677.12,48387.32,48558.8,48785.66,49738.93,50546.83,48293,51000.64,52495.67,52423.64,51945.91]},{"id":"TARGET_2060","label":"Target-date 2060 fund","explainer":"One fund that holds global stocks and bonds and gets more conservative as you age. What most 401k plans use as a default.","caution":null,"requiresAfter":2012,"series":["TARGET_2060"],"endingValue":58459.31290304494,"xirr":0.1289750892728222,"path":[10223.5,15917.63,16471.57,15733.64,15332.43,15534.82,14379.03,14433.67,13329.5,14206.58,13672.41,12444.63,13130.33,14168.93,13590.84,17654.45,17131.88,17585.87,17802.18,17611.7,18532.79,19144.37,18631.3,17887.91,17387.05,18868.43,19819.4,19805.52,20577.94,21180.87,26849.27,27952.77,28358.09,28990.47,29622.46,30265.27,29572.2,31533.41,32401.73,36007.54,37657.96,43372.97,43772,45978.11,47950.57,48358.15,49736.35,51387.6,52322.85,52469.36,52962.57,54562.04,55571.44,52203.81,56651.57,59030.94,58901.07,58459.31]},{"id":"US_TOTAL","label":"US stock market","explainer":"Every US-listed company, weighted by size.","caution":"US stocks beat global stocks over the last decade. Nobody knew that in advance, and the reverse has happened in other decades. Treat this as context, not as a standard your strategy should have met.","requiresAfter":null,"series":["US_TOTAL"],"endingValue":60909.98037167112,"xirr":0.14278662396201425,"path":[10329.09,16134.32,16745.81,15731.01,15339.31,15839.37,14393.24,14357.26,13175.65,14407.58,13870.17,12589.96,13611,14314.69,13475.85,17511.94,17091.65,17554.83,17744.43,17820.73,19020.06,19716.2,19335.67,18407.56,17919.76,19607.8,20645.05,20876.28,21982.72,22699.36,28071.59,29407.8,30313.56,30886.49,31544.37,32184.72,31943.33,34987.37,35646.95,39391.53,40380.41,44805.92,44478.84,47258.77,49697.32,50835.39,52030.02,53809.45,54998.64,55147.13,55130.59,56001.65,55704.84,52919.6,58423.24,61449.56,61209.91,60909.98]},{"id":"US_500","label":"S&P 500","explainer":"The 500 largest US companies.","caution":"This is the single most hindsight-prone comparison available. US large caps had an exceptional run; picking them in advance would have been a concentrated bet, not prudence. Shown for context only.","requiresAfter":null,"series":["US_500"],"endingValue":62402.77396527137,"xirr":0.150958554071552,"path":[10346.01,16248.55,16989.48,16099.23,15619.48,16211.45,14788.09,14826.54,13601.87,14853.24,14239.8,12929.74,13979.63,14749.91,13904.74,17872.26,17425.45,18071.94,18359.28,18447.4,19648.33,20294.76,19963.96,19017.66,18604.98,20311.06,21241.3,21583.29,22707.78,23452.59,28880.49,30333.18,31416.07,31780.5,32540.05,33249.42,32933.55,35773.74,36669.7,40316.19,41543.03,46013.28,45640.57,48506.8,51014.6,52182.84,53268.24,55159.26,56477.57,56601.82,56647.1,57468.48,57002.99,54147.14,59859.66,63020.25,62415.26,62402.77]},{"id":"ALL_BONDS","label":"All bonds","explainer":"The whole US investment-grade bond market. Useful as a floor reference.","caution":null,"requiresAfter":null,"series":["BOND_TOTAL"],"endingValue":41006.47617528392,"xirr":0.012101365453677349,"path":[10003.5,16029.5,15979.81,15650.63,15472.21,15046.72,14449.37,14569.3,14327.45,14668.44,14257.73,13661.75,13503.28,13998.85,13885.46,17394.31,16929.88,17383.6,17486.17,17283.33,17245.3,17224.61,17110.93,16686.58,16432.94,17179,17788.85,17760.39,17518.85,17667.76,23663.16,24060.7,24272.44,24842.84,25203.06,25535.74,24907.56,26053.74,27351.28,30148.25,32568.25,39571.85,39730.14,39463.95,40063.8,39955.63,40415.12,40859.69,41104.84,41351.47,41227.42,41318.12,41979.21,41248.77,41310.64,41426.31,41538.16,41006.48]}]};
+
+/* The raw flow rows the payload above was computed over
+   (tools/portfolio/core/src/data/fixtures.json → input.rows, the contribution
+   and withdrawal types). Cumulative money in is derived from these and from
+   nothing else: it is never smoothed, annualised, or interpolated. */
+D.flows = [{"date":"2021-10-12","type":"contribution","amount":10000.0},{"date":"2021-11-15","type":"contribution","amount":6000.0},{"date":"2023-01-15","type":"contribution","amount":6000.0},{"date":"2023-01-15","type":"withdrawal","amount":3000.0},{"date":"2024-04-15","type":"contribution","amount":6500.0},{"date":"2024-11-15","type":"contribution","amount":875.0},{"date":"2024-12-15","type":"contribution","amount":1750.0},{"date":"2025-01-15","type":"contribution","amount":3500.0},{"date":"2025-01-15","type":"withdrawal","amount":875.0},{"date":"2025-02-15","type":"contribution","amount":1750.0},{"date":"2025-03-15","type":"contribution","amount":7000.0},{"date":"2026-02-15","type":"contribution","amount":7500.0},{"date":"2026-02-15","type":"withdrawal","amount":7500.0}];
 
 /* ── formatting ─────────────────────────────────────────────────────────── */
 const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -368,6 +614,7 @@ const usd  = v => '$' + nf(Math.round(v));
 const usd2 = v => '$' + nf(v, 2);
 const signed = v => (v < 0 ? '−' : '+') + usd(Math.abs(v));
 const monthOf = key => { const p = key.split('-'); return MON[+p[1] - 1] + ' ' + p[0]; };
+const dayOf   = key => { const p = key.split('-'); return (+p[2]) + ' ' + MON[+p[1] - 1]; };
 const yearOf  = key => key.split('-')[0];
 
 const obs = new Map(D.observations.map(o => [o.date, o.value]));
@@ -375,39 +622,427 @@ const n = D.months.length;
 const yourAt = i => { const v = obs.get(D.months[i]); return v === undefined ? null : v; };
 const lastObsBefore = i => { for (let j = i; j >= 0; j--) { const v = yourAt(j); if (v !== null) return { i: j, v: v }; } return null; };
 
-/* ── static copy driven by the data ─────────────────────────────────────── */
-document.getElementById('ref-label').textContent = D.referenceLabel;
-document.getElementById('ref-explainer').textContent = D.referenceExplainer;
-document.getElementById('th-ref').textContent = D.referenceLabel;
-document.getElementById('table-caption').textContent =
-  'Every month in the period. Your value is shown only where you recorded a balance.';
-document.getElementById('chart-desc').textContent =
-  'Line chart comparing your portfolio value against ' + D.referenceLabel + ' from ' +
-  monthOf(D.months[0]) + ' to ' + monthOf(D.months[n - 1]) + '. Your portfolio ends at ' +
-  usd2(D.endingValue) + ' from ' + D.observations.length + ' recorded balances; ' +
-  D.referenceLabel + ' ends at ' + usd2(D.referenceEndingValue) + ', a difference of ' +
-  signed(D.endingValue - D.referenceEndingValue) + '.';
+const byId = new Map(D.strategies.map(s => [s.id, s]));
+
+/* ── money you put in ───────────────────────────────────────────────────
+   Contributions minus withdrawals, running in date order. It is flat between
+   the dates money actually moved, so it is drawn as a step and never as a
+   diagonal — a diagonal would invent a contribution schedule nobody had. It
+   falls when someone withdraws. */
+const flowsSorted = D.flows.slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+const flowsByMonth = new Map();
+flowsSorted.forEach(function (f) {
+  const k = f.date.slice(0, 7);
+  if (!flowsByMonth.has(k)) flowsByMonth.set(k, []);
+  flowsByMonth.get(k).push(f);
+});
+const moneyIn = (function () {
+  const out = []; let run = 0, k = 0;
+  for (let i = 0; i < n; i++) {
+    while (k < flowsSorted.length && flowsSorted[k].date <= D.months[i]) {
+      run += flowsSorted[k].type === 'withdrawal' ? -flowsSorted[k].amount : flowsSorted[k].amount;
+      k++;
+    }
+    out.push(run);
+  }
+  return out;
+})();
+const flowsIn = i => flowsByMonth.get(D.months[i].slice(0, 7)) || null;
+const netIn = moneyIn[n - 1];
+let showMoneyIn = true;
+const FLOOR = 'var(--floor-line)';
+
+/* ── SVG helper ─────────────────────────────────────────────────────────── */
+const NS = 'http://www.w3.org/2000/svg';
+function S(tag, attrs, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) if (attrs[k] !== null && attrs[k] !== undefined) e.setAttribute(k, attrs[k]);
+  if (text !== null && text !== undefined) e.textContent = text;
+  return e;
+}
+
+
+/* ── series identity ────────────────────────────────────────────────────
+   The brand gives four categorical line colours and no more. Your own line
+   holds one of them, so three reference slots is the hard ceiling — see the
+   validator note in the footnotes. Every colour here falls under the chroma
+   floor, and bark against deep-green is effectively one colour to a protanope
+   (ΔE 1.6), so colour is never the only thing separating two lines: each slot
+   also owns a stroke pattern, and every line is labelled at its own end. */
+const SLOTS = [
+  { color: 'var(--series-1)', dash: null,   pattern: 'solid' },
+  { color: 'var(--series-2)', dash: '9 5',  pattern: 'dashed' },
+  { color: 'var(--series-3)', dash: '2 4',  pattern: 'dotted' }
+];
+const MAX_REFS = SLOTS.length;
+const YOU = { color: 'var(--series-you)', dash: null };
+
+/* short forms, used only where the gutter is too narrow for the catalogue name */
+const SHORT = {
+  GLOBAL_EQUITY: 'Global stocks', GLOBAL_8020: 'Global 80/20', GLOBAL_6040: 'Global 60/40',
+  TARGET_2060: 'Target 2060', US_TOTAL: 'US stocks', US_500: 'S&P 500', ALL_BONDS: 'All bonds'
+};
+const TINY = {
+  GLOBAL_EQUITY: 'Global', GLOBAL_8020: '80/20', GLOBAL_6040: '60/40',
+  TARGET_2060: 'Target', US_TOTAL: 'US', US_500: 'S&P', ALL_BONDS: 'Bonds'
+};
+
+/* ── availability: a strategy whose fund did not exist for the whole of the
+   user's history is disabled with its reason on show, never hidden ──────── */
+const startYear = +D.historyStart.slice(0, 4);
+const startMonth = D.historyStart.slice(0, 7);
+const startLabel = monthOf(D.months[0]);
+
+function eraBlock(s) {
+  if (s.requiresAfter != null && startYear <= s.requiresAfter) {
+    return 'Unavailable for your history. This fund did not exist before ' + s.requiresAfter +
+      ', and your history starts in ' + startYear + '. Comparing against it would mean inventing ' +
+      'the years before it launched.';
+  }
+  for (const key of s.series) {
+    const inc = D.inception[key];
+    if (inc != null && startYear < inc) {
+      return 'Unavailable for your history. Its ' + key.replace(/_/g, ' ').toLowerCase() +
+        ' component has no fund before ' + inc + ', and your history starts in ' + startYear + '.';
+    }
+    const ms = D.monthlyStart[key];
+    if (ms && startMonth < ms) {
+      return 'Unavailable for your history. Monthly returns for ' + key.replace(/_/g, ' ').toLowerCase() +
+        ' begin ' + monthOf(ms + '-01') + ', after your history starts.';
+    }
+  }
+  return null;
+}
+
+/* The full reason is printed once, in the picker head, where it stays on
+   screen next to every blocked row rather than being repeated four times. */
+const CAP_REASON = 'All three slots are in use — uncheck one to swap this in.';
+
+/* ── selection state: stable slots, so removing one reference never
+   recolours the others ──────────────────────────────────────────────────── */
+const slots = [null, null, null];
+const chosen = () => slots.map((id, i) => id ? { s: byId.get(id), slot: SLOTS[i] } : null).filter(Boolean);
+
+(function seed() {
+  const first = D.defaultReferenceId && byId.has(D.defaultReferenceId) && !eraBlock(byId.get(D.defaultReferenceId))
+    ? D.defaultReferenceId : null;
+  if (first) slots[0] = first;
+})();
+
+function toggle(id) {
+  const at = slots.indexOf(id);
+  if (at >= 0) { slots[at] = null; return; }
+  const free = slots.indexOf(null);
+  if (free < 0) return;
+  slots[free] = id;
+}
+
+/* ── the picker, beside the chart ───────────────────────────────────────
+   Every explainer is rendered here, in the DOM, next to the plot. A row opens
+   when it is chosen, when its + is pressed, or when its checkbox takes focus
+   — never on hover alone. Cautions and blocked reasons never close. */
+const refEls = new Map();
+const expanded = new Set();
+
+function keyLine(svg, color, dash) {
+  svg.textContent = '';
+  const ln = document.createElementNS(NS, 'line');
+  ln.setAttribute('x1', 0); ln.setAttribute('x2', 28);
+  ln.setAttribute('y1', 5); ln.setAttribute('y2', 5);
+  ln.setAttribute('stroke', color); ln.setAttribute('stroke-width', 2);
+  if (dash) ln.setAttribute('stroke-dasharray', dash);
+  svg.appendChild(ln);
+}
+/* Money in gets a filled swatch, not a stroke key: it is a different kind of
+   thing from a strategy and must not read as an eighth one. */
+function keyArea(svg) {
+  svg.textContent = '';
+  const r = document.createElementNS(NS, 'rect');
+  r.setAttribute('x', 0); r.setAttribute('y', 3.5);
+  r.setAttribute('width', 28); r.setAttribute('height', 6.5);
+  r.setAttribute('fill', 'var(--floor-fill)');
+  const ln = document.createElementNS(NS, 'line');
+  ln.setAttribute('x1', 0); ln.setAttribute('x2', 28);
+  ln.setAttribute('y1', 3.5); ln.setAttribute('y2', 3.5);
+  ln.setAttribute('stroke', FLOOR); ln.setAttribute('stroke-width', 1);
+  svg.appendChild(r); svg.appendChild(ln);
+}
+
+function buildRow(host, id, label, explainer, caution) {
+  const li = document.createElement('li');
+  li.className = 'ref';
+
+  const line = document.createElement('div');
+  line.className = 'ref-line';
+
+  const lab = document.createElement('label');
+  lab.className = 'ref-label';
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  box.id = 'ref-' + id;
+  const name = document.createElement('span');
+  name.textContent = label;
+  lab.appendChild(box); lab.appendChild(name);
+  line.appendChild(lab);
+
+  const key = document.createElementNS(NS, 'svg');
+  key.setAttribute('class', 'ref-key');
+  key.setAttribute('viewBox', '0 0 28 10');
+  key.setAttribute('aria-hidden', 'true');
+  line.appendChild(key);
+
+  const more = document.createElement('button');
+  more.type = 'button';
+  more.className = 'ref-more';
+  more.textContent = '+';
+  more.setAttribute('aria-expanded', 'false');
+  more.setAttribute('aria-controls', 'exp-' + id);
+  more.setAttribute('aria-label', 'What ' + label + ' is');
+  line.appendChild(more);
+  li.appendChild(line);
+
+  const exp = document.createElement('p');
+  exp.className = 'ref-explainer';
+  exp.id = 'exp-' + id;
+  exp.textContent = explainer;
+  li.appendChild(exp);
+
+  if (caution) {
+    const cau = document.createElement('div');
+    cau.className = 'ref-caution';
+    cau.id = 'cau-' + id;
+    const b = document.createElement('b');
+    b.textContent = 'Caution';
+    const t = document.createElement('span');
+    t.textContent = caution;
+    cau.appendChild(b); cau.appendChild(t);
+    li.appendChild(cau);
+  }
+
+  const reason = document.createElement('p');
+  reason.className = 'ref-reason';
+  reason.id = 'why-' + id;
+  reason.hidden = true;
+  li.appendChild(reason);
+
+  box.setAttribute('aria-describedby',
+    ['exp-' + id, caution ? 'cau-' + id : null, 'why-' + id].filter(Boolean).join(' '));
+  more.addEventListener('click', function () {
+    if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
+    paintRefs();
+  });
+
+  host.appendChild(li);
+  return { li: li, box: box, key: key, reason: reason, more: more };
+}
+
+const MONEY_IN_EXPLAINER = 'Contributions minus withdrawals as a running total, stepping only on the dates ' +
+  'money actually moved. The gap between it and your own line is your gain.';
+
+(function buildRail() {
+  const ctx = buildRow(document.getElementById('context-list'), 'MONEY_IN',
+    'Money you put in', MONEY_IN_EXPLAINER, null);
+  ctx.li.setAttribute('data-kind', 'context');
+  ctx.box.addEventListener('change', function () {
+    showMoneyIn = ctx.box.checked;
+    update(true, showMoneyIn
+      ? 'Money you put in is drawn on the chart, ending at ' + usd2(netIn) + '.'
+      : 'Money you put in is no longer drawn.');
+  });
+  refEls.set('MONEY_IN', ctx);
+
+  const host = document.getElementById('refs');
+  D.strategies.forEach(function (s) {
+    const el = buildRow(host, s.id, s.label, s.explainer, s.caution);
+    el.box.addEventListener('change', function () { toggle(s.id); update(true); });
+    refEls.set(s.id, el);
+  });
+})();
+
+/* The same seven again, below the card, at length and with nothing to press.
+   The picker is the control; this is the reading copy. */
+(function buildCatalogue() {
+  const host = document.getElementById('cat-list');
+  D.strategies.forEach(function (s) {
+    const li = document.createElement('li');
+    li.className = 'cat-item';
+
+    const h = document.createElement('p');
+    h.className = 'cat-name';
+    h.textContent = s.label;
+    li.appendChild(h);
+
+    const e = document.createElement('p');
+    e.className = 'cat-explainer';
+    e.textContent = s.explainer;
+    li.appendChild(e);
+
+    if (s.caution) {
+      const cau = document.createElement('div');
+      cau.className = 'cat-caution';
+      const b = document.createElement('b');
+      b.textContent = 'Caution';
+      const t = document.createElement('span');
+      t.textContent = s.caution;
+      cau.appendChild(b); cau.appendChild(t);
+      li.appendChild(cau);
+    }
+
+    const era = eraBlock(s);
+    if (era) {
+      const r = document.createElement('p');
+      r.className = 'cat-reason';
+      r.textContent = era;
+      li.appendChild(r);
+    }
+    host.appendChild(li);
+  });
+})();
+
+function paintRefs() {
+  const money = refEls.get('MONEY_IN');
+  const moneyOpen = showMoneyIn || expanded.has('MONEY_IN');
+  money.box.checked = showMoneyIn;
+  money.li.setAttribute('data-state', showMoneyIn ? 'on' : 'off');
+  money.li.setAttribute('data-open', moneyOpen ? '1' : '0');
+  money.more.hidden = showMoneyIn;
+  money.more.textContent = moneyOpen ? '\u2212' : '+';
+  money.more.setAttribute('aria-expanded', String(moneyOpen));
+  if (showMoneyIn) keyArea(money.key); else money.key.textContent = '';
+
+  const full = slots.indexOf(null) < 0;
+  D.strategies.forEach(function (s) {
+    const el = refEls.get(s.id);
+    const at = slots.indexOf(s.id);
+    const era = eraBlock(s);
+    const on = at >= 0;
+    const blocked = !!era || (!on && full);
+    const open = on || expanded.has(s.id);
+
+    el.box.checked = on;
+    el.box.disabled = blocked;
+    el.li.setAttribute('data-state', on ? 'on' : blocked ? 'blocked' : 'off');
+    el.li.setAttribute('data-open', open ? '1' : '0');
+    el.more.hidden = on;
+    el.more.textContent = open ? '\u2212' : '+';
+    el.more.setAttribute('aria-expanded', String(open));
+
+    if (on) keyLine(el.key, SLOTS[at].color, SLOTS[at].dash);
+    else el.key.textContent = '';
+
+    const why = era || (blocked ? CAP_REASON : null);
+    el.reason.hidden = !why;
+    el.reason.textContent = why || '';
+  });
+
+  const count = chosen().length;
+  document.getElementById('slot-count').textContent = count === MAX_REFS
+    ? 'all ' + MAX_REFS + ' reference slots used'
+    : count + ' of ' + MAX_REFS + ' reference slots used';
+  document.getElementById('cap-note').hidden = count < MAX_REFS;
+}
+
+/* ── cautions, rendered for as long as the strategy is on the chart ─────── */
+function paintCautions() {
+  const host = document.getElementById('cautions');
+  host.textContent = '';
+  chosen().forEach(function (c) {
+    if (!c.s.caution) return;
+    const box = document.createElement('div');
+    box.className = 'caution-strip';
+
+    const key = document.createElementNS(NS, 'svg');
+    key.setAttribute('width', 26); key.setAttribute('height', 10);
+    key.setAttribute('viewBox', '0 0 26 10'); key.setAttribute('aria-hidden', 'true');
+    const ln = document.createElementNS(NS, 'line');
+    ln.setAttribute('x1', 0); ln.setAttribute('x2', 26);
+    ln.setAttribute('y1', 5); ln.setAttribute('y2', 5);
+    ln.setAttribute('stroke', c.slot.color); ln.setAttribute('stroke-width', 2);
+    if (c.slot.dash) ln.setAttribute('stroke-dasharray', c.slot.dash);
+    key.appendChild(ln);
+    box.appendChild(key);
+
+    const txt = document.createElement('p');
+    txt.style.margin = '0';
+    const b = document.createElement('b');
+    b.textContent = c.s.label + ' — ';
+    txt.appendChild(b);
+    txt.appendChild(document.createTextNode(c.s.caution));
+    box.appendChild(txt);
+    host.appendChild(box);
+  });
+}
+
+/* ── copy that follows the selection ────────────────────────────────────── */
+function paintCopy() {
+  const c = chosen();
+  const refLabel = document.getElementById('ref-label');
+  const names = c.map(x => x.s.label);
+  const lede = document.getElementById('lede');
+  lede.textContent = '';
+  if (!names.length) {
+    lede.appendChild(document.createTextNode('How your money actually tracked, month by month — '));
+    refLabel.textContent = 'with no reference strategy chosen';
+    lede.appendChild(refLabel);
+    lede.appendChild(document.createTextNode('. Pick one from the panel beside the chart and it is drawn against your line, same money in, same money out, same months.'));
+  } else {
+    lede.appendChild(document.createTextNode('How your money actually tracked against just buying the boring thing — your balance against '));
+    refLabel.textContent = names.length === 1 ? names[0]
+      : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+    lede.appendChild(refLabel);
+    lede.appendChild(document.createTextNode(', same money in, same money out, same months.'));
+  }
+  document.getElementById('table-caption').textContent =
+    'Every month in the period. Your value is shown only where you recorded a balance.';
+
+  document.getElementById('chart-desc').textContent =
+    'Line chart of your portfolio value from ' + monthOf(D.months[0]) + ' to ' + monthOf(D.months[n - 1]) +
+    ', ending at ' + usd2(D.endingValue) + ' from ' + D.observations.length + ' recorded balances' +
+    (c.length ? ', against ' + c.length + ' reference ' + (c.length === 1 ? 'strategy' : 'strategies') + ': ' +
+      c.map(x => x.s.label + ' ending at ' + usd2(x.s.endingValue) + ', a difference of ' +
+        signed(D.endingValue - x.s.endingValue)).join('; ') : ', with no reference strategy selected') +
+    (showMoneyIn ? '. Money you put in is drawn as a step beneath, ending at ' + usd2(netIn) +
+      ', so the space between the two is a gain of ' + usd2(D.endingValue - netIn) : '') + '.';
+}
 
 /* legend — built with textContent, never innerHTML */
-(function buildLegend() {
+function paintLegend() {
   const host = document.getElementById('legend');
-  [
-    { name: 'Your portfolio', color: 'var(--series-you)', dot: true },
-    { name: D.referenceLabel + ' (reference)', color: 'var(--series-ref)', dot: false }
-  ].forEach(function (s) {
+  host.textContent = '';
+  const series = [{ name: 'Your portfolio', color: YOU.color, dash: null, dot: true, caution: false }]
+    .concat(chosen().map(c => ({
+      name: c.s.label, color: c.slot.color, dash: c.slot.dash, dot: false, caution: !!c.s.caution
+    })));
+  if (showMoneyIn) series.push({ name: 'Money you put in', area: true, dot: false, caution: false });
+
+  series.forEach(function (s) {
     const item = document.createElement('span');
     item.className = 'legend-item';
-    const key = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const key = document.createElementNS(NS, 'svg');
     key.setAttribute('class', 'legend-key');
     key.setAttribute('viewBox', '0 0 26 10');
     key.setAttribute('aria-hidden', 'true');
-    const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    ln.setAttribute('x1', 0); ln.setAttribute('x2', 26);
-    ln.setAttribute('y1', 5); ln.setAttribute('y2', 5);
-    ln.setAttribute('stroke', s.color); ln.setAttribute('stroke-width', 2);
-    key.appendChild(ln);
+    if (s.area) {
+      const r = document.createElementNS(NS, 'rect');
+      r.setAttribute('x', 0); r.setAttribute('y', 3.5);
+      r.setAttribute('width', 26); r.setAttribute('height', 6.5);
+      r.setAttribute('fill', 'var(--floor-fill)');
+      key.appendChild(r);
+      const edge = document.createElementNS(NS, 'line');
+      edge.setAttribute('x1', 0); edge.setAttribute('x2', 26);
+      edge.setAttribute('y1', 3.5); edge.setAttribute('y2', 3.5);
+      edge.setAttribute('stroke', FLOOR); edge.setAttribute('stroke-width', 1);
+      key.appendChild(edge);
+    } else {
+      const ln = document.createElementNS(NS, 'line');
+      ln.setAttribute('x1', 0); ln.setAttribute('x2', 26);
+      ln.setAttribute('y1', 5); ln.setAttribute('y2', 5);
+      ln.setAttribute('stroke', s.color); ln.setAttribute('stroke-width', 2);
+      if (s.dash) ln.setAttribute('stroke-dasharray', s.dash);
+      key.appendChild(ln);
+    }
     if (s.dot) {
-      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      const c = document.createElementNS(NS, 'circle');
       c.setAttribute('cx', 13); c.setAttribute('cy', 5); c.setAttribute('r', 3.5);
       c.setAttribute('fill', s.color);
       c.setAttribute('stroke', 'var(--surface)'); c.setAttribute('stroke-width', 2);
@@ -417,25 +1052,45 @@ document.getElementById('chart-desc').textContent =
     const label = document.createElement('span');
     label.textContent = s.name;
     item.appendChild(label);
+    if (s.caution) {
+      const tag = document.createElement('span');
+      tag.className = 'legend-tag';
+      tag.textContent = 'caution';
+      item.appendChild(tag);
+    }
     host.appendChild(item);
   });
-})();
+
+  if (!chosen().length) {
+    const note = document.createElement('span');
+    note.className = 'legend-item is-blank';
+    note.textContent = 'No reference selected — this is only your own balance.';
+    host.appendChild(note);
+  }
+}
 
 /* footer meta + data-quality state */
-(function buildFoot() {
+function paintFoot() {
   const foot = document.getElementById('chart-foot');
+  foot.textContent = '';
+  const c = chosen().length;
   const bits = [
     monthOf(D.months[0]) + ' – ' + monthOf(D.months[n - 1]),
     D.observations.length + ' recorded balances across ' + n + ' months',
     'dots mark months with an actual balance — nothing between them is invented',
+    c === 0 ? 'no reference strategy selected' : c + ' reference ' + (c === 1 ? 'strategy' : 'strategies') + ', same cash flows',
+    showMoneyIn ? 'money you put in stepped from ' + D.flows.length + ' recorded flows, net ' + usd(netIn)
+                : 'money you put in is switched off',
     'granularity: ' + D.dataQuality.granularity
   ];
   bits.forEach(function (t, i) {
     const s = document.createElement('span');
-    s.textContent = (i ? '\u00b7\u00a0' : '') + t;
+    s.textContent = (i ? '· ' : '') + t;
     foot.appendChild(s);
   });
+}
 
+(function buildWarnings() {
   const warnings = (D.dataQuality.warnings || []).slice();
   if (D.dataQuality.balanceCount < 3) {
     warnings.unshift('Only ' + D.dataQuality.balanceCount + ' balance rows. The shape of your line between them is unknown, and the annual figures are rough.');
@@ -454,13 +1109,6 @@ document.getElementById('chart-desc').textContent =
 })();
 
 /* ── the chart ──────────────────────────────────────────────────────────── */
-const NS = 'http://www.w3.org/2000/svg';
-function S(tag, attrs, text) {
-  const e = document.createElementNS(NS, tag);
-  for (const k in attrs) if (attrs[k] !== null && attrs[k] !== undefined) e.setAttribute(k, attrs[k]);
-  if (text !== null && text !== undefined) e.textContent = text;
-  return e;
-}
 function niceStep(raw) {
   const p = Math.pow(10, Math.floor(Math.log10(raw)));
   const m = raw / p;
@@ -470,21 +1118,29 @@ function niceStep(raw) {
 const host = document.getElementById('plot');
 const tip = document.getElementById('tip');
 let geom = null;
+/* Set only when the reader drove the change, so the chart confirms a click at
+   the fast duration and stays still on a resize. */
+let swap = false;
 
 function render() {
+  const picked = chosen();
   const W = Math.max(320, host.clientWidth);
-  const tiny = W < 460, narrow = W < 700;
-  const H = narrow ? 340 : 440;
+  const tiny = W < 460, narrow = W < 700, mid = W < 900;
+  const H = narrow ? 340 : (mid ? 480 : 440);
+  /* The gutter carries the end labels. With the picker beside the plot the
+     plot is narrower, so the gutter shrinks and the names shorten with it. */
   const M = {
     top: 28,
-    right: tiny ? 74 : (narrow ? 96 : 184),
+    right: tiny ? 78 : (narrow ? 100 : (mid ? 152 : 200)),
     bottom: 46,
     left: narrow ? 54 : 72
   };
   const plotW = W - M.left - M.right;
   const plotH = H - M.top - M.bottom;
 
-  const dataMax = Math.max.apply(null, D.reference.concat(D.observations.map(o => o.value)));
+  let dataMax = Math.max.apply(null, D.observations.map(o => o.value));
+  picked.forEach(function (c) { dataMax = Math.max(dataMax, Math.max.apply(null, c.s.path)); });
+  if (showMoneyIn) dataMax = Math.max(dataMax, Math.max.apply(null, moneyIn));
   const yMax = dataMax * 1.07;
   const step = niceStep(yMax / 4);
   const x = i => M.left + (n === 1 ? 0 : (i / (n - 1)) * plotW);
@@ -522,14 +1178,40 @@ function render() {
       class: 'axis-tick', x: x(i), y: y(0) + 22, 'text-anchor': 'middle'
     }, yearOf(D.months[i])));
   }
-  /* reference line — continuous, no markers */
-  svg.appendChild(S('polyline', {
-    fill: 'none', stroke: 'var(--series-ref)', 'stroke-width': 2,
-    'stroke-linejoin': 'round', 'stroke-linecap': 'round',
-    points: D.reference.map((v, i) => x(i) + ',' + y(v)).join(' ')
-  }));
 
-  /* your line — observed points only, connected directly */
+  /* money you put in — context, drawn first and beneath everything. A stone
+     wash from zero under a hairline, stepped: flat between the dates money
+     moved, vertical on the dates it did. It takes none of the four
+     categorical slots and carries no stroke pattern, so it cannot be read as
+     another portfolio. */
+  if (showMoneyIn) {
+    const step = [x(0) + ',' + y(moneyIn[0])];
+    for (let i = 1; i < n; i++) {
+      step.push(x(i) + ',' + y(moneyIn[i - 1]));
+      step.push(x(i) + ',' + y(moneyIn[i]));
+    }
+    svg.appendChild(S('polygon', {
+      fill: 'var(--floor-fill)', stroke: 'none',
+      points: x(0) + ',' + y(0) + ' ' + step.join(' ') + ' ' + x(n - 1) + ',' + y(0)
+    }));
+    svg.appendChild(S('polyline', {
+      fill: 'none', stroke: 'var(--floor-line)', 'stroke-width': 1,
+      'stroke-linejoin': 'miter', points: step.join(' ')
+    }));
+  }
+
+  /* reference lines — continuous, no markers, one stroke pattern each */
+  picked.forEach(function (c) {
+    svg.appendChild(S('polyline', {
+      fill: 'none', stroke: c.slot.color, 'stroke-width': 2,
+      'stroke-linejoin': 'round', 'stroke-linecap': c.slot.dash ? 'butt' : 'round',
+      'stroke-dasharray': c.slot.dash,
+      points: c.s.path.map((v, i) => x(i) + ',' + y(v)).join(' ')
+    }));
+  });
+
+  /* your line — observed points only, connected directly, drawn last so it
+     never disappears under a reference */
   const obsPts = [];
   for (let i = 0; i < n; i++) { const v = yourAt(i); if (v !== null) obsPts.push([i, v]); }
   svg.appendChild(S('polyline', {
@@ -544,19 +1226,23 @@ function render() {
     }));
   });
 
-  /* direct end labels, clear of the plot */
-  const labels = [
-    { yv: D.referenceEndingValue, color: 'var(--series-ref)', name: D.referenceLabel },
-    { yv: D.endingValue, color: 'var(--series-you)', name: 'Your portfolio' }
-  ].map(l => ({ ...l, y0: y(l.yv) }));
+  /* direct end labels, clear of the plot — the second encoding that carries
+     identity when two low-chroma colours read alike */
+  const labels = picked.map(c => ({
+    yv: c.s.endingValue, color: c.slot.color,
+    name: tiny ? (TINY[c.s.id] || c.s.label) : mid ? (SHORT[c.s.id] || c.s.label) : c.s.label
+  })).concat([{ yv: D.endingValue, color: YOU.color, name: narrow ? 'You' : 'Your portfolio' }])
+    .concat(showMoneyIn ? [{ yv: netIn, color: 'var(--floor-line)', name: tiny ? 'In' : 'Money in' }] : [])
+    .map(l => ({ ...l, y0: y(l.yv) }));
 
   /* keep them apart without detaching them from their lines */
-  const blockH = tiny ? 27 : 34;
+  const blockH = tiny ? 30 : 34;
   labels.sort((a, b) => a.y0 - b.y0);
   let ly = labels.map(l => l.y0);
   for (let i = 1; i < ly.length; i++) if (ly[i] - ly[i - 1] < blockH) ly[i] = ly[i - 1] + blockH;
   const overflow = ly[ly.length - 1] - (M.top + plotH);
   if (overflow > 0) ly = ly.map(v => v - overflow);
+  if (ly.length && ly[0] < M.top + 10) { const up = M.top + 10 - ly[0]; ly = ly.map(v => v + up); }
 
   labels.forEach(function (l, i) {
     const lx = M.left + plotW;
@@ -570,19 +1256,21 @@ function render() {
     svg.appendChild(S('circle', { cx: lx, cy: l.y0, r: 3.5, fill: l.color, stroke: 'var(--surface)', 'stroke-width': 2 }));
     svg.appendChild(S('text', {
       class: 'end-value', x: tx, y: ly[i], fill: l.color, 'text-anchor': 'start',
-      'font-size': tiny ? 14 : 17
+      'font-size': tiny ? 14 : (labels.length > 2 ? 15 : 17)
     }, tiny ? '$' + nf(Math.round(l.yv / 1000)) + 'k' : usd(l.yv)));
     svg.appendChild(S('text', {
-      class: 'end-name', x: tx, y: ly[i] + (tiny ? 13 : 15), fill: l.color,
+      class: 'end-name', x: tx, y: ly[i] + (tiny ? 13 : 14), fill: l.color,
       'text-anchor': 'start', 'font-size': tiny ? 8 : 9
-    }, tiny ? (l.name === 'Your portfolio' ? 'You' : 'Ref')
-            : narrow ? (l.name === 'Your portfolio' ? 'You' : 'Reference') : l.name));
+    }, l.name));
   });
 
-  /* crosshair layer */
+  /* crosshair layer — one dot per visible series */
   const cross = S('g', { id: 'crosshair', opacity: 0, 'pointer-events': 'none' });
   cross.appendChild(S('line', { id: 'cross-line', y1: M.top, y2: M.top + plotH, stroke: 'var(--muted)', 'stroke-width': 1, 'stroke-dasharray': '2 4' }));
-  cross.appendChild(S('circle', { id: 'cross-ref', r: 4.5, fill: 'var(--series-ref)', stroke: 'var(--surface)', 'stroke-width': 2 }));
+  picked.forEach(function (c, i) {
+    cross.appendChild(S('circle', { class: 'cross-ref', 'data-slot': i, r: 4.5, fill: c.slot.color, stroke: 'var(--surface)', 'stroke-width': 2 }));
+  });
+  if (showMoneyIn) cross.appendChild(S('circle', { id: 'cross-floor', r: 4, fill: 'var(--floor-line)', stroke: 'var(--surface)', 'stroke-width': 2 }));
   cross.appendChild(S('circle', { id: 'cross-you', r: 4.5, fill: 'var(--series-you)', stroke: 'var(--surface)', 'stroke-width': 2 }));
   svg.appendChild(cross);
 
@@ -614,6 +1302,7 @@ function render() {
     showAt(i);
   });
 
+  if (swap) svg.classList.add('is-swap');
   host.appendChild(svg);
   if (current !== null) showAt(current);
 }
@@ -631,7 +1320,7 @@ function hide() {
 function showAt(i) {
   current = i;
   const g = geom;
-  const refV = D.reference[i];
+  const picked = chosen();
   const youV = yourAt(i);
   const cx = g.x(i);
 
@@ -639,8 +1328,14 @@ function showAt(i) {
   c.setAttribute('opacity', 1);
   const cl = document.getElementById('cross-line');
   cl.setAttribute('x1', cx); cl.setAttribute('x2', cx);
-  const cr = document.getElementById('cross-ref');
-  cr.setAttribute('cx', cx); cr.setAttribute('cy', g.y(refV));
+  const dots = c.querySelectorAll('.cross-ref');
+  picked.forEach(function (p, k) {
+    if (!dots[k]) return;
+    dots[k].setAttribute('cx', cx);
+    dots[k].setAttribute('cy', g.y(p.s.path[i]));
+  });
+  const cf = document.getElementById('cross-floor');
+  if (cf) { cf.setAttribute('cx', cx); cf.setAttribute('cy', g.y(moneyIn[i])); }
   const cy = document.getElementById('cross-you');
   if (youV === null) { cy.setAttribute('opacity', 0); }
   else { cy.setAttribute('opacity', 1); cy.setAttribute('cx', cx); cy.setAttribute('cy', g.y(youV)); }
@@ -653,18 +1348,50 @@ function showAt(i) {
   tip.appendChild(month);
 
   const carried = youV === null ? lastObsBefore(i) : null;
-  addRow('var(--series-you)', youV === null ? '—' : usd2(youV), 'Your portfolio',
+  addRow(YOU.color, null, youV === null ? '—' : usd2(youV), 'Your portfolio',
     youV === null ? (carried ? 'no balance recorded · last: ' + usd(carried.v) + ', ' + monthOf(D.months[carried.i]) : 'no balance recorded yet') : null);
-  addRow('var(--series-ref)', usd2(refV), D.referenceLabel, null);
 
-  const diff = document.createElement('div');
-  diff.className = 'tip-diff';
-  const dl = document.createElement('span');
-  dl.textContent = 'Difference';
-  const dv = document.createElement('span');
-  dv.textContent = youV === null ? '—' : signed(youV - refV);
-  diff.appendChild(dl); diff.appendChild(dv);
-  tip.appendChild(diff);
+  if (showMoneyIn) {
+    addRow(FLOOR, null, usd2(moneyIn[i]), 'Money you put in',
+      youV === null ? null : 'gain ' + signed(youV - moneyIn[i]), true);
+  }
+
+  /* One reference keeps the original footer row. More than one and a footer
+     per series is noise, so each carries its own gap on the line beneath it. */
+  picked.forEach(function (p) {
+    addRow(p.slot.color, p.slot.dash, usd2(p.s.path[i]), p.s.label,
+      picked.length > 1 && youV !== null ? 'you ' + signed(youV - p.s.path[i]) + ' against this' : null);
+  });
+  if (picked.length === 1) {
+    const diff = document.createElement('div');
+    diff.className = 'tip-diff';
+    const dl = document.createElement('span');
+    dl.textContent = 'Difference';
+    const dv = document.createElement('span');
+    dv.textContent = youV === null ? '—' : signed(youV - picked[0].s.path[i]);
+    diff.appendChild(dl); diff.appendChild(dv);
+    tip.appendChild(diff);
+  }
+
+  /* The individual flows for this month, named only here. Two in one month
+     are listed separately: $2,000 in and $2,000 out is not nothing happening.
+     Months without a flow simply have no rows. */
+  const fl = flowsIn(i);
+  if (fl) {
+    const box = document.createElement('div');
+    box.className = 'tip-flows';
+    fl.forEach(function (f) {
+      const r = document.createElement('div');
+      r.className = 'tip-flow';
+      const what = document.createElement('b');
+      what.textContent = (f.type === 'withdrawal' ? 'Withdrawal ' : 'Contribution ') + usd(f.amount);
+      const when = document.createElement('span');
+      when.textContent = 'on ' + dayOf(f.date);
+      r.appendChild(what); r.appendChild(when);
+      box.appendChild(r);
+    });
+    tip.appendChild(box);
+  }
 
   /* position, flipping before it can leave the card */
   const tw = tip.offsetWidth, th = tip.offsetHeight;
@@ -672,19 +1399,34 @@ function showAt(i) {
   let left = cx * scale + 16;
   if (left + tw > host.clientWidth) left = cx * scale - tw - 16;
   left = Math.max(0, Math.min(host.clientWidth - tw, left));
-  let top = g.y(youV === null ? refV : youV) * scale - th - 14;
-  if (top < 0) top = g.y(refV) * scale + 18;
+  const anchorV = youV === null ? (picked.length ? picked[0].s.path[i] : 0) : youV;
+  let top = g.y(anchorV) * scale - th - 14;
+  if (top < 0) top = g.y(anchorV) * scale + 18;
   top = Math.max(0, Math.min(g.H * scale - th, top));
   tip.style.left = left + 'px';
   tip.style.top = top + 'px';
   tip.setAttribute('data-show', '1');
 
-  function addRow(color, value, name, note) {
+  function addRow(color, dash, value, name, note, area) {
     const row = document.createElement('div');
     row.className = 'tip-row';
-    const key = document.createElement('span');
-    key.className = 'tip-key';
-    key.style.background = color;
+    const key = document.createElementNS(NS, 'svg');
+    key.setAttribute('class', 'tip-key');
+    key.setAttribute('viewBox', '0 0 16 2');
+    key.setAttribute('aria-hidden', 'true');
+    if (area) {
+      const r = document.createElementNS(NS, 'rect');
+      r.setAttribute('x', 0); r.setAttribute('y', 0.4);
+      r.setAttribute('width', 16); r.setAttribute('height', 1.6);
+      r.setAttribute('fill', 'var(--floor-fill)');
+      key.appendChild(r);
+    }
+    const ln = document.createElementNS(NS, 'line');
+    ln.setAttribute('x1', 0); ln.setAttribute('x2', 16);
+    ln.setAttribute('y1', area ? 0.4 : 1); ln.setAttribute('y2', area ? 0.4 : 1);
+    ln.setAttribute('stroke', color); ln.setAttribute('stroke-width', area ? 0.8 : 2);
+    if (dash) ln.setAttribute('stroke-dasharray', dash);
+    key.appendChild(ln);
     const v = document.createElement('span');
     v.className = value === '—' ? 'tip-val is-empty' : 'tip-val';
     v.textContent = value;
@@ -703,25 +1445,51 @@ function showAt(i) {
 }
 
 /* ── table view — the same numbers, without hovering ────────────────────── */
-(function buildTable() {
+function buildTable() {
+  const picked = chosen();
+  const head = document.getElementById('table-head');
   const body = document.getElementById('table-body');
+  head.textContent = '';
+  body.textContent = '';
+
+  const cols = [{ t: 'Month', cls: '' }, { t: 'Your value', cls: '' }];
+  if (showMoneyIn) cols.push({ t: 'Money in', cls: 'col-delta' });
+  picked.forEach(function (p) {
+    cols.push({ t: p.s.label, cls: 'col-start' });
+    cols.push({ t: 'vs you', cls: 'col-delta', aria: 'Difference between your portfolio and ' + p.s.label });
+  });
+  cols.forEach(function (c) {
+    const th = document.createElement('th');
+    th.setAttribute('scope', 'col');
+    if (c.cls) th.className = c.cls;
+    if (c.aria) th.setAttribute('aria-label', c.aria);
+    th.textContent = c.t;
+    head.appendChild(th);
+  });
+
   for (let i = 0; i < n; i++) {
     const youV = yourAt(i);
-    const refV = D.reference[i];
     const tr = document.createElement('tr');
-    [
-      monthOf(D.months[i]),
-      youV === null ? '—' : usd2(youV),
-      usd2(refV),
-      youV === null ? '—' : signed(youV - refV)
-    ].forEach(function (t, ci) {
+    const cells = [monthOf(D.months[i]), youV === null ? '—' : usd2(youV)];
+    if (showMoneyIn) cells.push(usd2(moneyIn[i]));
+    picked.forEach(function (p) {
+      cells.push(usd2(p.s.path[i]));
+      cells.push(youV === null ? '—' : signed(youV - p.s.path[i]));
+    });
+    const base = showMoneyIn ? 3 : 2;
+    cells.forEach(function (t, ci) {
       const cell = document.createElement(ci === 0 ? 'th' : 'td');
       if (ci === 0) cell.setAttribute('scope', 'row');
+      if (ci === 2 && showMoneyIn) cell.className = 'col-delta';
+      else if (ci >= base) cell.className = (ci - base) % 2 === 0 ? 'col-start' : 'col-delta';
       cell.textContent = t;
       tr.appendChild(cell);
     });
     body.appendChild(tr);
   }
+}
+
+(function wireTable() {
   const btn = document.getElementById('table-toggle');
   const view = document.getElementById('table-view');
   btn.addEventListener('click', function () {
@@ -731,7 +1499,29 @@ function showAt(i) {
   });
 })();
 
-render();
+/* ── one update path for every state change ─────────────────────────────── */
+function update(announce, msg) {
+  paintRefs();
+  paintCautions();
+  paintCopy();
+  paintLegend();
+  paintFoot();
+  buildTable();
+  hide();
+  swap = !!announce;
+  render();
+  swap = false;
+  if (announce) {
+    const c = chosen();
+    document.getElementById('sel-live').textContent = msg || (c.length
+      ? c.length + ' reference ' + (c.length === 1 ? 'strategy' : 'strategies') + ' shown: ' +
+        c.map(x => x.s.label + (x.s.caution ? ' (carries a caution)' : '')).join(', ') +
+        (slots.indexOf(null) < 0 ? '. All three slots are now full.' : '')
+      : 'No reference strategy shown. The chart now has only your own balance.');
+  }
+}
+
+update(false);
 let rt;
 window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(render, 120); });
 

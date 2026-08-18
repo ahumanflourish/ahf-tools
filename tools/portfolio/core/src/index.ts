@@ -23,6 +23,7 @@ export {
   // market weight (derived, not sourced — see engine.ts)
   impliedUsMarketWeight,
   FALLBACK_US_MARKET_WEIGHT,
+  DEFAULT_MARKET_WEIGHT_WINDOW,
   REGIONAL_TILT_THRESHOLD,
   // strategy construction and replay
   buildStrategySeries,

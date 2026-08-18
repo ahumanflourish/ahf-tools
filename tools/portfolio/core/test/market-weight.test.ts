@@ -9,7 +9,12 @@
  */
 import { describe, it, expect } from 'vitest';
 
-import { analyse, impliedUsMarketWeight, FALLBACK_US_MARKET_WEIGHT } from '../src/index';
+import {
+  analyse,
+  impliedUsMarketWeight,
+  FALLBACK_US_MARKET_WEIGHT,
+  DEFAULT_MARKET_WEIGHT_WINDOW,
+} from '../src/index';
 import type { AnalysisResult, BenchmarkData, PortfolioInput, StrategyDef } from '../src/index';
 
 import benchmarksJson from '../src/data/benchmarks.json' with { type: 'json' };
@@ -43,13 +48,16 @@ const usShare = (() => {
 
 describe('derived US market weight', () => {
   it('recovers the weight the benchmark series actually implies', () => {
-    // Whole shipped series: 0.6126, not the 0.63 the constant claimed.
-    const full = impliedUsMarketWeight(benchmarks, undefined, 600);
-    expect(full).not.toBeNull();
-    expect(full!.usEquity).toBeCloseTo(0.6126, 3);
-    expect(full!.source).toBe('derived');
-    expect(full!.months).toBe(58);
-    expect(Math.abs(full!.usEquity - FALLBACK_US_MARKET_WEIGHT)).toBeGreaterThan(0.01);
+    // Anchored to the end of the series on the default window. Asserted as a
+    // band, not a constant: the value legitimately moves when a month is
+    // appended, and pinning it to 4dp would make the monthly refresh fail.
+    const recent = impliedUsMarketWeight(benchmarks);
+    expect(recent).not.toBeNull();
+    expect(recent!.source).toBe('derived');
+    expect(recent!.months).toBe(DEFAULT_MARKET_WEIGHT_WINDOW);
+    expect(recent!.usEquity).toBeGreaterThan(0.58);
+    expect(recent!.usEquity).toBeLessThan(0.66);
+    expect(Math.abs(recent!.usEquity - FALLBACK_US_MARKET_WEIGHT)).toBeGreaterThan(0.005);
 
     // And it is not a constant: per calendar year it moves by ~3pp across
     // five years, which is a fifth of the 15pp tilt threshold.
@@ -75,8 +83,8 @@ describe('derived US market weight', () => {
 
     expect(r.marketWeight.source).toBe('derived');
     expect(r.marketWeight.asOf).toBe('2023-08'); // holdings are asOf 2023-08-31
-    expect(r.marketWeight.months).toBe(23); // series starts 2021-10
-    expect(r.marketWeight.usEquity).toBeCloseTo(0.5995, 3);
+    expect(r.marketWeight.months).toBe(DEFAULT_MARKET_WEIGHT_WINDOW);
+    expect(r.marketWeight.usEquity).toBeCloseTo(0.5998, 3);
 
     // The finding fires on the derived weight (16.9pp) and would NOT have
     // fired on the old 0.63 constant (13.8pp). That difference is the whole
@@ -121,11 +129,14 @@ describe('derived US market weight', () => {
   });
 
   it('falls back to the constant when the data cannot support a derivation', () => {
-    // Holdings dated before there is enough series to regress on: the shipped
-    // data starts 2021-10, so a 2021-11 snapshot leaves two usable months.
-    expect(impliedUsMarketWeight(benchmarks, '2021-11')).toBeNull();
+    // Holdings dated before there is enough series to regress on. GLOBAL_EQUITY
+    // is the binding series and starts 2010-01, so a 2010-06 snapshot leaves
+    // six usable months, under the twelve-month floor. Derived from the data
+    // rather than hardcoded, so extending coverage again cannot silently
+    // invalidate this the way a fixed date did.
+    expect(impliedUsMarketWeight(benchmarks, '2010-06')).toBeNull();
 
-    const r = run({ holdings: { ...fixture.holdings, asOf: '2021-11-30' } });
+    const r = run({ holdings: { ...fixture.holdings, asOf: '2010-06-30' } });
     expect(r.marketWeight).toEqual({
       usEquity: FALLBACK_US_MARKET_WEIGHT,
       asOf: null,

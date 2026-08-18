@@ -822,15 +822,39 @@ export const REGIONAL_TILT_THRESHOLD = 0.15;
  * factsheet weights if they are ever added to the data.
  *
  * The weight is anchored to `asOf` because it moves: it sat near 0.60 in 2022
- * and near 0.63 in 2025, and was far lower before 2010. A single constant is
- * wrong over any long window.
+ * and near 0.63 in 2025, and was near 0.37 in 2010. A single constant is wrong
+ * over any long window.
+ *
+ * WHY THE WINDOW IS SHORT, AND WHY LONGER IS WORSE.
+ * A regression returns the AVERAGE weight over its window, so a trailing window
+ * lags the truth by roughly half its length. The weight drifts about 2pp a
+ * year, so lengthening the window buys a little less estimator noise at the
+ * cost of a lot more staleness. Measured on the shipped series:
+ *
+ *   anchored 2023-08:  12mo 0.608 | 24mo 0.600 | 36mo 0.598 | 60mo 0.577 | 120mo 0.552
+ *   anchored 2026-07:  12mo 0.618 | 24mo 0.623 | 36mo 0.624 | 60mo 0.612 | 120mo 0.582
+ *
+ * 12 to 36 months agree closely; past that the estimate lags badly — at 120
+ * months it returns roughly the 2018 weight for a 2026 date. This is the rare
+ * estimator that gets WORSE as more history becomes available, which is exactly
+ * what happened when the monthly series was extended back to 1996: a 60-month
+ * default silently began answering a question about 2018.
+ *
+ * 24 is the default because it sits inside the stable band with a margin at
+ * both ends, and because it still averages two full annual cycles.
  *
  * Returns null when fewer than 12 usable months precede `asOf`.
  */
+/**
+ * Trailing months used to estimate the market weight. See the note on
+ * `impliedUsMarketWeight` — longer is not safer here.
+ */
+export const DEFAULT_MARKET_WEIGHT_WINDOW = 24;
+
 export function impliedUsMarketWeight(
   data: BenchmarkData,
   asOf?: string,
-  windowMonths = 60,
+  windowMonths = DEFAULT_MARKET_WEIGHT_WINDOW,
 ): MarketWeight | null {
   const g = data.monthly['GLOBAL_EQUITY'];
   const u = data.monthly['US_TOTAL'];
