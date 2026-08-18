@@ -63,12 +63,31 @@
      enough width to stay readable beside it. */
   --rail: clamp(248px, 25vw, 320px);
 
-  /* Chart — series identity. Two categorical slots, validated against the
-     cream surface. Neither carries a shipped state meaning. */
-  --series-you: var(--dusty-blue);
+  /* Chart — series identity. The user's own line takes terracotta: it is the
+     brand's emphasis colour and the user's own portfolio is the subject of the
+     whole page, so spending the emphasis on a benchmark would be backwards. It
+     is also the heaviest stroke here, which is not decoration — terracotta is
+     2.94:1 on cream and 3.15:1 on the raised plot surface, and weight is what
+     carries a low-contrast hue at chart scale.
+
+     The seven reference slots then use the rest of the palette. Colour is the
+     SECOND encoding, never the first: several of these pairs collapse under
+     red-green colour vision deficiency (deep-green/bark is ΔE 1.6 to a
+     protanope), so the stroke pattern is what actually separates them and the
+     closest pairs are given the most different dash grammars. See the SLOTS
+     table in the script for the assignment and its reasoning. */
+  --series-you: var(--terracotta);
   --series-1: var(--deep-green);
-  --series-2: var(--sage);
-  --series-3: var(--bark);
+  --series-2: var(--bark);
+  --series-3: var(--dusty-blue);
+  --series-4: var(--sage);
+  --series-5: var(--moss);
+  --series-6: var(--stone);
+  --series-7: var(--gold);
+  /* The plot is drawn on the raised surface, not the page. That is this
+     brand's sanctioned way to lift a panel, and it buys the low-contrast
+     hues real ratio: terracotta 2.94 → 3.15, stone 2.99 → 3.20. */
+  --plot-surface: var(--surface-raised);
   --grid: var(--line-soft);
   /* Money in is context, not a competitor: it takes none of the four
      categorical slots, so it is a stone hairline over a wash of the same. */
@@ -143,17 +162,26 @@ h1.display { font-size: var(--text-h1); max-width: 30ch; color: var(--accent); }
 /* ── Chart and picker as one unit ───────────────────────────────────────
    The picker sits beside the plot at desk widths and directly beneath it on a
    phone. A checkbox and the line it draws are never on different screens. */
+/* Row order is the whole layout-stability argument, so it is written down
+   here rather than left implicit: EVERY control comes before EVERY block whose
+   height depends on what is selected. The head carries the two buttons, the
+   plot has a state-independent height, and the rail carries the checkboxes —
+   all three are fixed. Cautions, the meta line and the data-quality panel all
+   grow and shrink, and all three sit below the last control at both widths. A
+   caution can therefore never push the chart, and selecting a strategy can
+   never move a checkbox. */
 .chart-layout {
   display: grid;
-  grid-template-areas: "head" "caut" "plot" "rail" "foot";
+  grid-template-areas: "head" "plot" "rail" "caut" "foot" "dq";
   grid-template-columns: minmax(0, 1fr);
   column-gap: 28px;
 }
 .chart-head { grid-area: head; }
-.cautions   { grid-area: caut; }
 .plot-wrap  { grid-area: plot; }
 .rail       { grid-area: rail; }
+.cautions   { grid-area: caut; }
 .chart-foot { grid-area: foot; }
+.dq         { grid-area: dq; }
 
 .rail {
   margin-top: 22px; padding-top: 16px;
@@ -161,13 +189,13 @@ h1.display { font-size: var(--text-h1); max-width: 30ch; color: var(--accent); }
 }
 @media (min-width: 1060px) {
   .chart-layout {
-    grid-template-areas: "head rail" "caut rail" "plot rail" "foot rail" ".    rail";
+    grid-template-areas: "head rail" "plot rail" "caut rail" "foot rail" "dq rail" ".    rail";
     grid-template-columns: minmax(0, 1fr) var(--rail);
     /* The rail spans every row. The trailing flexible row absorbs whatever
        height it has over the chart column, so the plot and its meta line stay
        together at the top of the card instead of the slack being shared out
        among them. */
-    grid-template-rows: auto auto auto auto 1fr;
+    grid-template-rows: auto auto auto auto auto 1fr;
   }
   .rail {
     align-self: start; margin-top: 0; padding-top: 0;
@@ -176,21 +204,16 @@ h1.display { font-size: var(--text-h1); max-width: 30ch; color: var(--accent); }
   }
 }
 
+/* There is no legend above the plot. The rail carries every strategy's name
+   beside its own stroke pattern, so the rail IS the legend, and the chart
+   labels each line at its own end. Three namings of the same seven series was
+   two too many — and a legend that grows a row per series was one of the
+   blocks that pushed the chart down. */
 .chart-head {
-  display: flex; flex-wrap: wrap; align-items: flex-start;
-  justify-content: space-between; gap: 16px 24px;
-  margin-bottom: 18px;
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: flex-end; gap: 10px 14px;
+  margin-bottom: 16px;
 }
-
-/* Legend — always present for two series */
-.legend { display: flex; flex-wrap: wrap; gap: 8px 24px; flex: 1 1 0; min-width: 0; }
-.legend-item {
-  display: inline-flex; align-items: center; gap: 9px;
-  font-size: var(--text-meta); font-weight: 600;
-  text-transform: uppercase; letter-spacing: var(--tracking-micro);
-  color: var(--muted);
-}
-.legend-key { display: block; width: 26px; height: 10px; flex: none; }
 
 /* Toggle — dotted when idle, solid when chosen; fast, because the user drove it */
 .choice {
@@ -235,7 +258,9 @@ svg.chart:focus-visible { outline: var(--border-thick) dotted var(--accent); out
   position: absolute; top: 0; left: 0;
   min-width: 178px; max-width: 264px; pointer-events: none;
   background: var(--surface-raised);
-  border: var(--border-thin) solid var(--line);
+  /* The plot beneath is now the raised surface too, so the tooltip earns its
+     lift with border weight instead — borders are this brand's elevation. */
+  border: var(--border-normal) solid var(--line);
   border-radius: var(--radius);
   padding: 10px 12px 11px;
   opacity: 0; transition: opacity var(--fast) ease-out;
@@ -248,8 +273,8 @@ svg.chart:focus-visible { outline: var(--border-thick) dotted var(--accent); out
   color: var(--subtle); margin-bottom: 7px;
 }
 .tip-row { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; }
-.tip-row + .tip-note { margin: 1px 0 0 24px; line-height: 1.35; }
-.tip-key { display: block; width: 16px; height: 2px; flex: none; transform: translateY(-4px); }
+.tip-row + .tip-note { margin: 1px 0 0 44px; line-height: 1.35; }
+.tip-key { display: block; width: 36px; height: 2px; flex: none; transform: translateY(-4px); }
 .tip-val {
   font-size: 15px; font-weight: 600; color: var(--ink);
   font-variant-numeric: tabular-nums;
@@ -287,12 +312,24 @@ svg.chart:focus-visible { outline: var(--border-thick) dotted var(--accent); out
 }
 .chart-foot span { font-variant-numeric: tabular-nums; }
 
-.warn {
-  margin-bottom: 18px; padding: 10px 14px;
-  border: var(--border-thin) dashed var(--attention);
-  background: var(--attention-soft);
-  font-size: 14px; color: var(--muted);
+/* Data quality. `granularity` is always on the meta line; the warnings are
+   long, so they live behind a control in the head and open into a panel at the
+   very bottom of the card — nothing the user aims at sits below it, so opening
+   it moves no control and no part of the chart. */
+.dq { margin-top: 22px; }
+.dq-panel {
+  padding-top: 14px;
+  border-top: var(--border-thin) dotted var(--line);
 }
+.dq-panel .label { margin-bottom: 10px; }
+.dq-note {
+  margin: 0 0 10px; padding: 10px 13px;
+  border: var(--border-thin) dashed var(--line);
+  background: var(--surface-raised);
+  font-size: 13px; line-height: 1.5; color: var(--muted);
+  max-width: 88ch;
+}
+.dq-note:last-child { margin-bottom: 0; }
 
 /* Table view */
 .table-wrap { margin-top: 24px; max-height: 380px; overflow: auto; }
@@ -355,28 +392,28 @@ a:hover { color: var(--accent); text-decoration-style: solid; }
   border-top: var(--border-thin) dotted var(--line-soft);
 }
 .rail-sub .label { margin-bottom: 0; }
-.slot-count {
-  display: block; margin: 8px 0 0;
-  font-size: var(--text-label); font-weight: 600;
-  text-transform: uppercase; letter-spacing: var(--tracking-micro);
-  color: var(--subtle); font-variant-numeric: tabular-nums;
-}
 
 .refs { list-style: none; margin: 9px 0 0; padding: 0; }
 .ref {
   position: relative;
   padding: 7px 9px 8px; margin-bottom: 2px;
-  border: var(--border-thin) dotted transparent;
+  /* The border WIDTH never changes — only its style and colour. A row that
+     grew half a pixel when it was ticked moved every row under it, which is
+     the same defect as a caution strip pushing the chart, just smaller. */
+  border: var(--border-normal) dotted transparent;
   border-bottom-color: var(--line-soft);
   transition: border-color var(--fast) var(--ease), background-color var(--fast) var(--ease);
 }
 .ref[data-state="on"] {
-  border: var(--border-normal) solid var(--ink);
-  background: color-mix(in oklab, var(--surface-raised) 70%, transparent);
+  border-style: solid; border-color: var(--ink);
+  background: var(--surface-raised);
 }
 .ref[data-state="blocked"] {
   border-bottom-style: dashed; border-bottom-color: var(--line); opacity: 0.74;
 }
+/* While one of a row's two disclosures is open the row owns it, visibly. */
+.ref[data-pop="open"] { border-color: var(--ink); border-style: solid; }
+.ref[data-pop="caution"] { border-color: var(--attention); border-style: solid; }
 
 .ref-line { display: flex; align-items: center; gap: 8px; }
 .ref-label {
@@ -394,14 +431,28 @@ a:hover { color: var(--accent); text-decoration-style: solid; }
 }
 .ref-label input:checked { border-color: var(--ink); background: var(--ink); }
 .ref-label input:disabled { border-style: dashed; }
-.ref-key { display: block; width: 28px; height: 10px; flex: none; }
+/* Wide enough for the pattern to repeat. At 28px a 26-on/10-off dash showed
+   one segment and read as solid — the swatch has to be long enough to prove
+   which stroke it is, because that is the whole job it has. */
+.ref-key { display: block; width: 46px; height: 10px; flex: none; }
 /* Two disclosures, one grammar. They sit in their own group with real space
    between them so a thumb cannot take the wrong one, and outside the <label>
-   so neither can ever tick the box. */
-.ref-tools { display: flex; align-items: center; gap: 10px; flex: none; }
+   so neither can ever tick the box.
+
+   A fixed two-column grid, warning first: the (i) is then the last column in
+   every row and lands on the same x whether the row carries a caution or not,
+   and the triangles line up in a column of their own. Rows without a caution
+   leave their first cell empty rather than shifting the (i) inward. */
+.ref-tools {
+  display: grid; align-items: center; flex: none;
+  grid-template-columns: var(--tool-size) var(--tool-size);
+  gap: 10px;
+  --tool-size: 24px;
+}
 .ref-pop-btn {
   display: grid; place-items: center;
-  width: 24px; height: 24px; padding: 0; flex: none;
+  width: var(--tool-size); height: var(--tool-size); padding: 0; flex: none;
+  grid-row: 1; grid-column: 2;
   background: transparent; cursor: pointer; color: var(--muted);
   border: var(--border-thin) dotted var(--line); border-radius: var(--radius);
   transition: border-color var(--fast) var(--ease), color var(--fast) var(--ease),
@@ -415,15 +466,27 @@ a:hover { color: var(--accent); text-decoration-style: solid; }
 }
 /* The triangle is a warning by its shape first. Terracotta agrees with it;
    it is never the only thing saying so. */
-.ref-pop-btn.is-caution { color: var(--attention); border-color: var(--attention); }
+.ref-pop-btn.is-caution { color: var(--attention); border-color: var(--attention); grid-row: 1; grid-column: 1; }
 .ref-pop-btn.is-caution:hover,
 .ref-pop-btn.is-caution[aria-expanded="true"] {
   color: var(--attention); border-color: var(--attention);
 }
 
-/* The panel. Raised off the page by its border and surface, never a shadow. */
+/* The panel. Raised off the page by its border and surface, never a shadow.
+
+   It never flips above its trigger. In a vertical list an upward flip puts the
+   panel under the PREVIOUS row's name and reads as belonging to it — the US
+   stock market caution appearing directly beneath "Global stock market" was
+   exactly that. So it always opens downward, flush against the bottom edge of
+   its own row (sharing that border), with a notch pointing up at the button
+   that opened it, and the row itself takes a solid border while it is open.
+   Three things say which row this belongs to, and none of them is position
+   guesswork. If the panel would fall below the fold it scrolls into view,
+   which moves the page rather than the layout. */
 .ref-pop {
-  position: absolute; z-index: 4; left: 0; right: 0; top: calc(100% + 4px);
+  position: absolute; z-index: 4; left: 0; right: 0;
+  top: calc(100% + var(--border-normal));
+  margin-top: calc(-1 * var(--border-normal));
   padding: 9px 11px 10px;
   background: var(--surface-raised);
   border: var(--border-normal) solid var(--ink);
@@ -435,7 +498,19 @@ a:hover { color: var(--accent); text-decoration-style: solid; }
   outline: 5px solid var(--surface);
   animation: pop-in var(--fast) var(--ease);
 }
-.ref-pop[data-flip="up"] { top: auto; bottom: calc(100% + 4px); }
+/* The notch: a square of the panel's own surface, rotated, showing only the
+   two borders that face the trigger. No radius, no shadow, no arrow glyph. */
+.ref-pop::after {
+  content: ""; position: absolute; z-index: 1;
+  width: 9px; height: 9px;
+  left: var(--notch-x, 50%); top: calc(-1 * var(--border-normal));
+  margin-left: -4.5px;
+  background: var(--surface-raised);
+  border-left: var(--border-normal) solid var(--ink);
+  border-top: var(--border-normal) solid var(--ink);
+  transform: translateY(-50%) rotate(45deg);
+}
+.ref-pop.is-caution::after { border-color: var(--attention); background: var(--attention-soft); }
 .ref-pop.is-caution { border-color: var(--attention); background: var(--attention-soft); }
 .ref-pop.is-caution b {
   display: block; font-weight: 600; color: var(--ink);
@@ -448,9 +523,16 @@ a:hover { color: var(--accent); text-decoration-style: solid; }
   font-size: var(--text-meta); line-height: 1.4; color: var(--subtle); font-style: italic;
 }
 
-/* Caution strip — sits with the chart, for as long as the strategy is on it.
-   Not dismissable: there is no control here to dismiss it with. */
-.cautions:not(:empty) { margin-bottom: 18px; }
+/* Caution strip — sits with the chart, for as long as the strategy is drawn.
+   Not dismissable: there is no control here to dismiss it with. It sits BELOW
+   the plot and below the rail, so appearing costs the chart and the checkboxes
+   nothing.
+
+   It is a filled, outlined block carrying the triangle glyph, and it holds
+   nothing line-like. That matters more than it used to: terracotta is now the
+   user's own stroke as well as the attention colour, and a terracotta line and
+   a terracotta warning box must not read as the same object. */
+.cautions:not(:empty) { margin-top: 20px; }
 .caution-strip {
   display: flex; gap: 10px; align-items: flex-start;
   padding: 10px 13px; margin-bottom: 10px;
@@ -459,25 +541,17 @@ a:hover { color: var(--accent); text-decoration-style: solid; }
   font-size: 13px; line-height: 1.5; color: var(--muted);
 }
 .caution-strip:last-child { margin-bottom: 0; }
-.caution-strip svg { flex: none; margin-top: 5px; }
+.caution-strip svg { flex: none; margin-top: 3px; color: var(--attention); }
 .caution-strip b { font-weight: 600; color: var(--ink); }
 
-.legend-tag {
-  margin-left: 7px; padding: 1px 5px;
-  border: var(--border-thin) solid var(--attention);
-  color: var(--attention); font-size: var(--text-micro);
-  letter-spacing: var(--tracking-micro);
+.chart-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.choice[aria-expanded="true"] {
+  border-style: solid; border-color: var(--ink);
+  color: var(--ink); background: color-mix(in oklab, var(--accent) 12%, transparent);
 }
-.legend-item.is-blank { color: var(--subtle); font-style: italic; text-transform: none; letter-spacing: 0; font-weight: 500; }
-
-.chart-actions { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+.choice .count { font-variant-numeric: tabular-nums; opacity: 0.75; margin-left: 6px; }
 th.col-delta, td.col-delta { color: var(--muted); font-size: 12px; }
 th.col-start, td.col-start { border-left: var(--border-thin) dotted var(--line-soft); }
-.cap-note {
-  margin: 10px 0 0; padding: 8px 10px;
-  border: var(--border-thin) dotted var(--ink);
-  font-size: var(--text-meta); line-height: 1.45; color: var(--ink);
-}
 
 @media (max-width: 640px) {
   /* Worst case here is a month with three references, money in and two flows.
@@ -498,8 +572,7 @@ th.col-start, td.col-start { border-left: var(--border-thin) dotted var(--line-s
    because a tablet at 800px is still being tapped: bigger targets, and more
    air between the two so a thumb cannot take the wrong one. */
 @media (pointer: coarse) {
-  .ref-tools { gap: 14px; }
-  .ref-pop-btn { width: 32px; height: 32px; }
+  .ref-tools { gap: 14px; --tool-size: 32px; }
 }
 
 /* The user drove the change, so the chart confirms it at the fast duration.
@@ -526,42 +599,47 @@ svg.chart.is-swap { animation: chart-swap var(--fast) var(--ease); }
 
   <div class="head">
     <h1 class="display">Portfolio value over time</h1>
-    <p class="lede" id="lede">How your money actually tracked against just buying the boring thing — your balance against <strong id="ref-label">the reference strategy</strong>, same money in, same money out, same months.</p>
+    <p class="lede" id="lede">How your money actually tracked against just buying the boring thing — your balance against
+      any of the reference strategies, same money in, same money out, same months. Tick as many as you want to see;
+      each one is named on the chart at its own end.</p>
   </div>
-
-  <div id="dq-warning" hidden></div>
 
   <section class="card" aria-labelledby="chart-title">
     <h2 id="chart-title" class="visually-hidden">Portfolio value over time</h2>
 
     <div class="chart-layout">
 
+      <!-- Both controls live here, in a row whose height never changes. What
+           they reveal is rendered at the bottom of the card, where growing
+           costs nothing above it. -->
       <div class="chart-head">
-        <div class="legend" id="legend"></div>
         <div class="chart-actions">
+          <button type="button" class="choice" id="dq-toggle" aria-expanded="false" aria-controls="dq-panel" hidden>Data notes<span class="count" id="dq-count"></span></button>
           <button type="button" class="choice" id="table-toggle" aria-pressed="false" aria-controls="table-view">Table view</button>
         </div>
       </div>
-
-      <div class="cautions" id="cautions" role="region" aria-label="Cautions on the strategies currently shown"></div>
 
       <div class="plot-wrap" id="plot">
         <div class="tip" id="tip" role="status" aria-live="polite"></div>
       </div>
 
+      <div class="cautions" id="cautions" role="region" aria-label="Cautions on the strategies currently shown"></div>
+
       <div class="chart-foot" id="chart-foot"></div>
+
+      <div class="dq" id="dq">
+        <div class="dq-panel" id="dq-panel" role="region" aria-label="What this data can and cannot tell you" hidden></div>
+      </div>
 
       <!-- The picker. Beside the plot on a desk, directly under it on a phone,
            inside the same card either way. -->
       <div class="rail" id="picker" role="group" aria-labelledby="picker-title">
         <div class="rail-head">
           <p class="label" id="picker-title">Compare against</p>
-          <p class="rail-note">Your own line is always drawn. Add up to <strong>three</strong> references &mdash;
-            same money in, same money out, same months. Every row will tell you what it is, and flags a caution
-            where there is one, before you choose it.</p>
-          <p class="slot-count" id="slot-count"></p>
-          <p class="cap-note" id="cap-note" hidden>All three reference slots are full. Past three, the lines get
-            hard to tell apart. Uncheck one to swap another in.</p>
+          <p class="rail-note">Your own line is always drawn. Add as many references as you like &mdash;
+            same money in, same money out, same months. Each takes its own stroke pattern, shown here beside its
+            name, and is labelled at its own end on the chart. Every row will tell you what it is, and flags a
+            caution where there is one, before you choose it.</p>
         </div>
         <ul class="refs" id="refs" aria-labelledby="picker-title"></ul>
 
@@ -599,10 +677,15 @@ svg.chart.is-swap { animation: chart-swap var(--fast) var(--ease); }
 </main>
 
 <script>
-/* Computed by tools/portfolio/core analyse() over the reference fixture.
-   Every strategy path here comes out of one analyse() call — the engine
-   already computes all seven, so switching between them recomputes nothing. */
-const D = {"historyStart":"2021-10-12","historyEnd":"2026-07-31","endingValue":53690.25,"netContributed":39500,"yourXirr":0.10054387101873885,"defaultReferenceId":"GLOBAL_EQUITY","dataQuality":{"balanceCount":27,"flowCount":13,"granularity":"annual","firstDate":"2021-10-12","lastDate":"2026-07-31","warnings":[]},"months":["2021-10-31","2021-11-30","2021-12-31","2022-01-31","2022-02-28","2022-03-31","2022-04-30","2022-05-31","2022-06-30","2022-07-31","2022-08-31","2022-09-30","2022-10-31","2022-11-30","2022-12-31","2023-01-31","2023-02-28","2023-03-31","2023-04-30","2023-05-31","2023-06-30","2023-07-31","2023-08-31","2023-09-30","2023-10-31","2023-11-30","2023-12-31","2024-01-31","2024-02-29","2024-03-31","2024-04-30","2024-05-31","2024-06-30","2024-07-31","2024-08-31","2024-09-30","2024-10-31","2024-11-30","2024-12-31","2025-01-31","2025-02-28","2025-03-31","2025-04-30","2025-05-31","2025-06-30","2025-07-31","2025-08-31","2025-09-30","2025-10-31","2025-11-30","2025-12-31","2026-01-31","2026-02-28","2026-03-31","2026-04-30","2026-05-31","2026-06-30","2026-07-31"],"observations":[{"date":"2021-10-31","value":10014.74},{"date":"2021-11-30","value":15879.92},{"date":"2021-12-31","value":16500.81},{"date":"2022-01-31","value":15596.22},{"date":"2022-09-30","value":12359.97},{"date":"2022-11-30","value":14081.32},{"date":"2022-12-31","value":13412.47},{"date":"2023-01-31","value":17664.31},{"date":"2023-09-30","value":17625.17},{"date":"2023-11-30","value":18475.94},{"date":"2023-12-31","value":19602.4},{"date":"2024-03-31","value":21061.89},{"date":"2024-04-30","value":26566.43},{"date":"2024-05-31","value":27628.75},{"date":"2024-09-30","value":29788.35},{"date":"2024-11-30","value":31754.24},{"date":"2024-12-31","value":32235.32},{"date":"2025-01-31","value":35835.11},{"date":"2025-02-28","value":37103.49},{"date":"2025-03-31","value":42405.47},{"date":"2025-09-30","value":49438.47},{"date":"2025-11-30","value":49986.41},{"date":"2025-12-31","value":50088.67},{"date":"2026-02-28","value":51915.09},{"date":"2026-03-31","value":50134.52},{"date":"2026-06-30","value":53969.84},{"date":"2026-07-31","value":53690.25}],"inception":{"US_500":1976,"US_TOTAL":1992,"INTL_TOTAL":1996,"BOND_TOTAL":1986,"GLOBAL_EQUITY":2008,"TARGET_2060":2012},"monthlyStart":{"US_TOTAL":"2021-10","INTL_TOTAL":"2021-10","BOND_TOTAL":"2021-10","US_500":"2021-10","GLOBAL_EQUITY":"2021-10","TARGET_2060":"2021-10","CASH":"2021-10"},"strategies":[{"id":"GLOBAL_EQUITY","label":"Global stock market","explainer":"Every listed company in the world, weighted by size. The simplest possible 'do nothing' portfolio and the fairest yardstick for a stock-heavy strategy.","caution":null,"requiresAfter":null,"series":["GLOBAL_EQUITY"],"endingValue":60328.401081907454,"xirr":0.13955446880793432,"path":[10254.27,15906.48,16512.52,15756.25,15319.8,15609.34,14344.99,14415.28,13244.76,14169.24,13595.39,12299.75,13084.47,14167.86,13538.81,17687.17,17124.71,17612.77,17862.87,17646.73,18672,19366.6,18816.59,18015,17488.97,19064.72,20048.46,20048.46,20948.64,21616.9,27225.6,28477.98,28930.78,29503.61,30191.04,30855.25,30182.6,32325.09,33098.82,36776.5,38372.13,43897.12,44142.95,46707.65,48888.9,49426.68,50889.71,52604.69,53667.31,53780.01,54274.78,55962.73,56880.52,53342.55,58308.74,60979.28,60747.56,60328.4]},{"id":"GLOBAL_8020","label":"Global 80/20","explainer":"Global stocks with a fifth in bonds. A common setting for someone decades from retirement who still wants some cushion.","caution":null,"requiresAfter":null,"series":["GLOBAL_EQUITY","BOND_TOTAL"],"endingValue":56023.71275381106,"xirr":0.1147257983716764,"path":[10204.61,15929.89,16407.74,15738.96,15355.38,15498.17,14370.43,14450.94,13470.8,14275.71,13735.2,12582.88,13174.13,14137.12,13613.78,17637.13,17093.67,17575.2,17796.46,17582.83,18399.92,18954.47,18489.84,17761.93,17289.11,18702.74,19613.54,19607.26,20258.52,20814.37,26504.63,27577.55,27979.87,28552.88,29171.88,29766.71,29102.65,31036.15,31918.89,35397.06,37181.2,43036.03,43262.85,45199.57,47031.85,47426.22,48667.99,50102.54,50984.61,51127.6,51484.94,52788.54,53650.14,50782.82,54567.01,56622.51,56474.6,56023.71]},{"id":"GLOBAL_6040","label":"Global 60/40","explainer":"The classic balanced portfolio. Lower highs and shallower lows.","caution":null,"requiresAfter":null,"series":["GLOBAL_EQUITY","BOND_TOTAL"],"endingValue":51945.91171903132,"xirr":0.08957667779124023,"path":[10154.7,15953.87,16302.1,15719.79,15388.45,15386.33,14393.63,14484.2,13692.15,14378.92,13871.39,12860.72,13260.88,14104.86,13685.97,17582.79,17058.65,17533.47,17725.54,17514.51,18121.07,18534,18155.73,17502.42,17083.48,18333,19169.9,19157.63,19569.95,20017.53,25787.31,26684.9,27037.83,27610.7,28162.71,28689.64,28034.34,29763.59,30753.26,34043.81,36004.41,42171.71,42380.27,43720.48,45220.43,45478.63,46509.6,47677.12,48387.32,48558.8,48785.66,49738.93,50546.83,48293,51000.64,52495.67,52423.64,51945.91]},{"id":"TARGET_2060","label":"Target-date 2060 fund","explainer":"One fund that holds global stocks and bonds and gets more conservative as you age. What most 401k plans use as a default.","caution":null,"requiresAfter":2012,"series":["TARGET_2060"],"endingValue":58459.31290304494,"xirr":0.1289750892728222,"path":[10223.5,15917.63,16471.57,15733.64,15332.43,15534.82,14379.03,14433.67,13329.5,14206.58,13672.41,12444.63,13130.33,14168.93,13590.84,17654.45,17131.88,17585.87,17802.18,17611.7,18532.79,19144.37,18631.3,17887.91,17387.05,18868.43,19819.4,19805.52,20577.94,21180.87,26849.27,27952.77,28358.09,28990.47,29622.46,30265.27,29572.2,31533.41,32401.73,36007.54,37657.96,43372.97,43772,45978.11,47950.57,48358.15,49736.35,51387.6,52322.85,52469.36,52962.57,54562.04,55571.44,52203.81,56651.57,59030.94,58901.07,58459.31]},{"id":"US_TOTAL","label":"US stock market","explainer":"Every US-listed company, weighted by size.","caution":"US stocks beat global stocks over the last decade. Nobody knew that in advance, and the reverse has happened in other decades. Treat this as context, not as a standard your strategy should have met.","requiresAfter":null,"series":["US_TOTAL"],"endingValue":60909.98037167112,"xirr":0.14278662396201425,"path":[10329.09,16134.32,16745.81,15731.01,15339.31,15839.37,14393.24,14357.26,13175.65,14407.58,13870.17,12589.96,13611,14314.69,13475.85,17511.94,17091.65,17554.83,17744.43,17820.73,19020.06,19716.2,19335.67,18407.56,17919.76,19607.8,20645.05,20876.28,21982.72,22699.36,28071.59,29407.8,30313.56,30886.49,31544.37,32184.72,31943.33,34987.37,35646.95,39391.53,40380.41,44805.92,44478.84,47258.77,49697.32,50835.39,52030.02,53809.45,54998.64,55147.13,55130.59,56001.65,55704.84,52919.6,58423.24,61449.56,61209.91,60909.98]},{"id":"US_500","label":"S&P 500","explainer":"The 500 largest US companies.","caution":"This is the single most hindsight-prone comparison available. US large caps had an exceptional run; picking them in advance would have been a concentrated bet, not prudence. Shown for context only.","requiresAfter":null,"series":["US_500"],"endingValue":62402.77396527137,"xirr":0.150958554071552,"path":[10346.01,16248.55,16989.48,16099.23,15619.48,16211.45,14788.09,14826.54,13601.87,14853.24,14239.8,12929.74,13979.63,14749.91,13904.74,17872.26,17425.45,18071.94,18359.28,18447.4,19648.33,20294.76,19963.96,19017.66,18604.98,20311.06,21241.3,21583.29,22707.78,23452.59,28880.49,30333.18,31416.07,31780.5,32540.05,33249.42,32933.55,35773.74,36669.7,40316.19,41543.03,46013.28,45640.57,48506.8,51014.6,52182.84,53268.24,55159.26,56477.57,56601.82,56647.1,57468.48,57002.99,54147.14,59859.66,63020.25,62415.26,62402.77]},{"id":"ALL_BONDS","label":"All bonds","explainer":"The whole US investment-grade bond market. Useful as a floor reference.","caution":null,"requiresAfter":null,"series":["BOND_TOTAL"],"endingValue":41006.47617528392,"xirr":0.012101365453677349,"path":[10003.5,16029.5,15979.81,15650.63,15472.21,15046.72,14449.37,14569.3,14327.45,14668.44,14257.73,13661.75,13503.28,13998.85,13885.46,17394.31,16929.88,17383.6,17486.17,17283.33,17245.3,17224.61,17110.93,16686.58,16432.94,17179,17788.85,17760.39,17518.85,17667.76,23663.16,24060.7,24272.44,24842.84,25203.06,25535.74,24907.56,26053.74,27351.28,30148.25,32568.25,39571.85,39730.14,39463.95,40063.8,39955.63,40415.12,40859.69,41104.84,41351.47,41227.42,41318.12,41979.21,41248.77,41310.64,41426.31,41538.16,41006.48]}]};
+/* Computed by tools/portfolio/core analyse() over the reference fixture:
+     analyse({ ...fixtures.input, holdings: fixtures.holdings },
+             benchmarks, strategies.strategies)
+   run against build/dist/esm/index.js. Every strategy path here comes out of
+   that one call — the engine already computes all seven, so switching between
+   them recomputes nothing — and dataQuality is the engine's, verbatim:
+   granularity `quarterly`, three warnings. Checks: endingValue 53690.25,
+   GLOBAL_EQUITY 60328.40. */
+const D = {"historyStart":"2021-10-12","historyEnd":"2026-07-31","endingValue":53690.25,"netContributed":39500,"yourXirr":0.10054387101873885,"defaultReferenceId":"GLOBAL_EQUITY","dataQuality":{"balanceCount":27,"flowCount":13,"granularity":"quarterly","firstDate":"2021-10-12","lastDate":"2026-07-31","warnings":["Balances cover 27 of the 58 months in this period — about one every 2 months, and the longest stretch without one runs 8 months. Between observations your value is drawn as a straight line rather than observed, and each period's return is estimated from your contribution dates rather than measured directly. Month-end balances would sharpen both.","2021 covers 61 days (2021-10-31 to 2021-12-31), not a full year. Its return is the plain return over those 61 days, not annualised, so it should not be read alongside the full years as if it were one. If the account existed before 2021-10-31, adding an earlier balance would make it a full year.","2026 covers 212 days (2025-12-31 to 2026-07-31), not a full year. Its return is the plain return over those 212 days, not annualised, so it should not be read alongside the full years as if it were one. It fills in as the year completes."]},"months":["2021-10-31","2021-11-30","2021-12-31","2022-01-31","2022-02-28","2022-03-31","2022-04-30","2022-05-31","2022-06-30","2022-07-31","2022-08-31","2022-09-30","2022-10-31","2022-11-30","2022-12-31","2023-01-31","2023-02-28","2023-03-31","2023-04-30","2023-05-31","2023-06-30","2023-07-31","2023-08-31","2023-09-30","2023-10-31","2023-11-30","2023-12-31","2024-01-31","2024-02-29","2024-03-31","2024-04-30","2024-05-31","2024-06-30","2024-07-31","2024-08-31","2024-09-30","2024-10-31","2024-11-30","2024-12-31","2025-01-31","2025-02-28","2025-03-31","2025-04-30","2025-05-31","2025-06-30","2025-07-31","2025-08-31","2025-09-30","2025-10-31","2025-11-30","2025-12-31","2026-01-31","2026-02-28","2026-03-31","2026-04-30","2026-05-31","2026-06-30","2026-07-31"],"observations":[{"date":"2021-10-31","value":10014.74},{"date":"2021-11-30","value":15879.92},{"date":"2021-12-31","value":16500.81},{"date":"2022-01-31","value":15596.22},{"date":"2022-09-30","value":12359.97},{"date":"2022-11-30","value":14081.32},{"date":"2022-12-31","value":13412.47},{"date":"2023-01-31","value":17664.31},{"date":"2023-09-30","value":17625.17},{"date":"2023-11-30","value":18475.94},{"date":"2023-12-31","value":19602.4},{"date":"2024-03-31","value":21061.89},{"date":"2024-04-30","value":26566.43},{"date":"2024-05-31","value":27628.75},{"date":"2024-09-30","value":29788.35},{"date":"2024-11-30","value":31754.24},{"date":"2024-12-31","value":32235.32},{"date":"2025-01-31","value":35835.11},{"date":"2025-02-28","value":37103.49},{"date":"2025-03-31","value":42405.47},{"date":"2025-09-30","value":49438.47},{"date":"2025-11-30","value":49986.41},{"date":"2025-12-31","value":50088.67},{"date":"2026-02-28","value":51915.09},{"date":"2026-03-31","value":50134.52},{"date":"2026-06-30","value":53969.84},{"date":"2026-07-31","value":53690.25}],"inception":{"US_500":1976,"US_TOTAL":1992,"INTL_TOTAL":1996,"BOND_TOTAL":1986,"GLOBAL_EQUITY":2008,"TARGET_2060":2012},"monthlyStart":{"US_TOTAL":"1996-01","INTL_TOTAL":"2004-01","BOND_TOTAL":"1996-01","US_500":"1996-01","GLOBAL_EQUITY":"2010-01","TARGET_2060":"2021-10","CASH":"2021-10"},"strategies":[{"id":"GLOBAL_EQUITY","label":"Global stock market","explainer":"Every listed company in the world, weighted by size. The simplest possible 'do nothing' portfolio and the fairest yardstick for a stock-heavy strategy.","caution":null,"requiresAfter":null,"series":["GLOBAL_EQUITY"],"endingValue":60328.401081907454,"xirr":0.13955446880793432,"path":[10254.27,15906.48,16512.52,15756.25,15319.8,15609.34,14344.99,14415.28,13244.76,14169.24,13595.39,12299.75,13084.47,14167.86,13538.81,17687.17,17124.71,17612.77,17862.87,17646.73,18672,19366.6,18816.59,18015,17488.97,19064.72,20048.46,20048.46,20948.64,21616.9,27225.6,28477.98,28930.78,29503.61,30191.04,30855.25,30182.6,32325.09,33098.82,36776.5,38372.13,43897.12,44142.95,46707.65,48888.9,49426.68,50889.71,52604.69,53667.31,53780.01,54274.78,55962.73,56880.52,53342.55,58308.74,60979.28,60747.56,60328.4]},{"id":"GLOBAL_8020","label":"Global 80/20","explainer":"Global stocks with a fifth in bonds. A common setting for someone decades from retirement who still wants some cushion.","caution":null,"requiresAfter":null,"series":["GLOBAL_EQUITY","BOND_TOTAL"],"endingValue":56023.71275381106,"xirr":0.1147257983716764,"path":[10204.61,15929.89,16407.74,15738.96,15355.38,15498.17,14370.43,14450.94,13470.8,14275.71,13735.2,12582.88,13174.13,14137.12,13613.78,17637.13,17093.67,17575.2,17796.46,17582.83,18399.92,18954.47,18489.84,17761.93,17289.11,18702.74,19613.54,19607.26,20258.52,20814.37,26504.63,27577.55,27979.87,28552.88,29171.88,29766.71,29102.65,31036.15,31918.89,35397.06,37181.2,43036.03,43262.85,45199.57,47031.85,47426.22,48667.99,50102.54,50984.61,51127.6,51484.94,52788.54,53650.14,50782.82,54567.01,56622.51,56474.6,56023.71]},{"id":"GLOBAL_6040","label":"Global 60/40","explainer":"The classic balanced portfolio. Lower highs and shallower lows.","caution":null,"requiresAfter":null,"series":["GLOBAL_EQUITY","BOND_TOTAL"],"endingValue":51945.91171903132,"xirr":0.08957667779124023,"path":[10154.7,15953.87,16302.1,15719.79,15388.45,15386.33,14393.63,14484.2,13692.15,14378.92,13871.39,12860.72,13260.88,14104.86,13685.97,17582.79,17058.65,17533.47,17725.54,17514.51,18121.07,18534,18155.73,17502.42,17083.48,18333,19169.9,19157.63,19569.95,20017.53,25787.31,26684.9,27037.83,27610.7,28162.71,28689.64,28034.34,29763.59,30753.26,34043.81,36004.41,42171.71,42380.27,43720.48,45220.43,45478.63,46509.6,47677.12,48387.32,48558.8,48785.66,49738.93,50546.83,48293,51000.64,52495.67,52423.64,51945.91]},{"id":"TARGET_2060","label":"Target-date 2060 fund","explainer":"One fund that holds global stocks and bonds and gets more conservative as you age. What most 401k plans use as a default.","caution":"These returns are Vanguard’s 2060 fund at 0.08% a year. In a 401k you get whichever 2060 fund the plan offers, and that one can cost several times more — enter its expense ratio to compare against what was on your menu.","requiresAfter":2012,"series":["TARGET_2060"],"endingValue":58459.31290304494,"xirr":0.1289750892728222,"path":[10223.5,15917.63,16471.57,15733.64,15332.43,15534.82,14379.03,14433.67,13329.5,14206.58,13672.41,12444.63,13130.33,14168.93,13590.84,17654.45,17131.88,17585.87,17802.18,17611.7,18532.79,19144.37,18631.3,17887.91,17387.05,18868.43,19819.4,19805.52,20577.94,21180.87,26849.27,27952.77,28358.09,28990.47,29622.46,30265.27,29572.2,31533.41,32401.73,36007.54,37657.96,43372.97,43772,45978.11,47950.57,48358.15,49736.35,51387.6,52322.85,52469.36,52962.57,54562.04,55571.44,52203.81,56651.57,59030.94,58901.07,58459.31]},{"id":"US_TOTAL","label":"US stock market","explainer":"Every US-listed company, weighted by size.","caution":"US stocks beat global stocks over the last decade. Nobody knew that in advance, and the reverse has happened in other decades. Treat this as context, not as a standard your strategy should have met.","requiresAfter":null,"series":["US_TOTAL"],"endingValue":60909.98037167112,"xirr":0.14278662396201425,"path":[10329.09,16134.32,16745.81,15731.01,15339.31,15839.37,14393.24,14357.26,13175.65,14407.58,13870.17,12589.96,13611,14314.69,13475.85,17511.94,17091.65,17554.83,17744.43,17820.73,19020.06,19716.2,19335.67,18407.56,17919.76,19607.8,20645.05,20876.28,21982.72,22699.36,28071.59,29407.8,30313.56,30886.49,31544.37,32184.72,31943.33,34987.37,35646.95,39391.53,40380.41,44805.92,44478.84,47258.77,49697.32,50835.39,52030.02,53809.45,54998.64,55147.13,55130.59,56001.65,55704.84,52919.6,58423.24,61449.56,61209.91,60909.98]},{"id":"US_500","label":"S&P 500","explainer":"The 500 largest US companies.","caution":"This is the single most hindsight-prone comparison available. US large caps had an exceptional run; picking them in advance would have been a concentrated bet, not prudence. Shown for context only.","requiresAfter":null,"series":["US_500"],"endingValue":62402.77396527137,"xirr":0.150958554071552,"path":[10346.01,16248.55,16989.48,16099.23,15619.48,16211.45,14788.09,14826.54,13601.87,14853.24,14239.8,12929.74,13979.63,14749.91,13904.74,17872.26,17425.45,18071.94,18359.28,18447.4,19648.33,20294.76,19963.96,19017.66,18604.98,20311.06,21241.3,21583.29,22707.78,23452.59,28880.49,30333.18,31416.07,31780.5,32540.05,33249.42,32933.55,35773.74,36669.7,40316.19,41543.03,46013.28,45640.57,48506.8,51014.6,52182.84,53268.24,55159.26,56477.57,56601.82,56647.1,57468.48,57002.99,54147.14,59859.66,63020.25,62415.26,62402.77]},{"id":"ALL_BONDS","label":"All bonds","explainer":"The whole US investment-grade bond market. Useful as a floor reference.","caution":null,"requiresAfter":null,"series":["BOND_TOTAL"],"endingValue":41006.47617528392,"xirr":0.012101365453677349,"path":[10003.5,16029.5,15979.81,15650.63,15472.21,15046.72,14449.37,14569.3,14327.45,14668.44,14257.73,13661.75,13503.28,13998.85,13885.46,17394.31,16929.88,17383.6,17486.17,17283.33,17245.3,17224.61,17110.93,16686.58,16432.94,17179,17788.85,17760.39,17518.85,17667.76,23663.16,24060.7,24272.44,24842.84,25203.06,25535.74,24907.56,26053.74,27351.28,30148.25,32568.25,39571.85,39730.14,39463.95,40063.8,39955.63,40415.12,40859.69,41104.84,41351.47,41227.42,41318.12,41979.21,41248.77,41310.64,41426.31,41538.16,41006.48]}]};
 
 /* The raw flow rows the payload above was computed over
    (tools/portfolio/core/src/data/fixtures.json → input.rows, the contribution
@@ -666,19 +749,68 @@ function S(tag, attrs, text) {
 
 
 /* ── series identity ────────────────────────────────────────────────────
-   The brand gives four categorical line colours and no more. Your own line
-   holds one of them, so three reference slots is the hard ceiling — see the
-   validator note in the footnotes. Every colour here falls under the chroma
-   floor, and bark against deep-green is effectively one colour to a protanope
-   (ΔE 1.6), so colour is never the only thing separating two lines: each slot
-   also owns a stroke pattern, and every line is labelled at its own end. */
+   Nine things can be on this chart at once: your line, contributions and
+   withdrawals, and seven references. Colour cannot carry that on this palette
+   and is not asked to. Measured OKLab ΔE (×100), with colour vision deficiency
+   simulated by Machado–Oliveira–Fernandes at severity 1.0:
+
+     deep-green / bark   normal  5.8  protan 1.6  deutan 2.5   worst in palette
+     sage / stone        normal  4.5  protan 1.9  deutan 2.5
+     terracotta / moss   normal 11.4  protan 6.6  deutan 2.4   fine until it isn't
+     terracotta / sage   normal 11.2  protan 2.8  deutan 6.3   fine until it isn't
+
+   So the STROKE PATTERN is the primary separator and the closest pairs are
+   given the most different dash grammars, not neighbouring variations on one
+   rhythm. Colour is the second encoding; the direct end label is the third and
+   is the one that always works.
+
+     slot  colour      pattern         dasharray            paired against
+     you   terracotta  solid, heavy    —                    everything: weight
+                       + markers                            and markers set it
+                                                            apart on its own
+     0     deep-green  solid           —                    vs bark: solid v dot
+     1     bark        dot             1.5 8                the worst pair, so
+                                                            the widest gap in
+                                                            the pattern set
+     2     dusty-blue  long dash       26 10                hue is distinct, so
+                                                            it can afford the
+                                                            pattern nearest to
+                                                            solid
+     3     sage        dash-dot        16 6 1.5 6           vs terracotta-solid
+                                                            (protan 2.8) and vs
+                                                            stone (protan 1.9)
+     4     moss        fine dash       3 6                  vs terracotta-solid
+                                                            (deutan 2.4) and vs
+                                                            sage's dash-dot
+     5     stone       medium dash     11 7                 vs sage's dash-dot;
+                                                            late in the order,
+                                                            because stone is
+                                                            also the money-in
+                                                            hairline's hue
+     6     gold        dash-dot-dot    16 6 1.5 6 1.5 6     2.02:1 on cream is
+                       heaviest ref                         weak on any surface,
+                                                            so it goes last, with
+                                                            weight and a pattern
+                                                            nothing else shares
+
+   Stroke weight is load-bearing, not decoration: the contrast floor is
+   calibrated for thin strokes, so the hues that miss 3:1 (moss, gold, and
+   terracotta itself) are drawn heavier, and the plot sits on the raised
+   surface rather than the page. */
 const SLOTS = [
-  { color: 'var(--series-1)', dash: null,   pattern: 'solid' },
-  { color: 'var(--series-2)', dash: '9 5',  pattern: 'dashed' },
-  { color: 'var(--series-3)', dash: '2 4',  pattern: 'dotted' }
+  { color: 'var(--series-1)', dash: null,               cap: 'round', w: 2,   pattern: 'solid' },
+  { color: 'var(--series-2)', dash: '1.5 8',            cap: 'round', w: 2.4, pattern: 'dotted' },
+  { color: 'var(--series-3)', dash: '26 10',            cap: 'butt',  w: 2,   pattern: 'long dash' },
+  { color: 'var(--series-4)', dash: '16 6 1.5 6',       cap: 'round', w: 2,   pattern: 'dash-dot' },
+  { color: 'var(--series-5)', dash: '3 6',              cap: 'butt',  w: 2.4, pattern: 'fine dash' },
+  { color: 'var(--series-6)', dash: '11 7',             cap: 'butt',  w: 2.2, pattern: 'medium dash' },
+  { color: 'var(--series-7)', dash: '16 6 1.5 6 1.5 6', cap: 'round', w: 2.8, pattern: 'dash-dot-dot' }
 ];
-const MAX_REFS = SLOTS.length;
-const YOU = { color: 'var(--series-you)', dash: null };
+/* Your own line. Terracotta because it is the brand's emphasis colour and this
+   is the series the page is about; heaviest because terracotta is 3.15:1 on
+   the raised plot surface and a hairline would not carry it; and the only line
+   with markers, because only it has real observations behind it. */
+const YOU = { color: 'var(--series-you)', dash: null, cap: 'round', w: 3.2 };
 
 /* short forms, used only where the gutter is too narrow for the full name */
 const SHORT = {
@@ -717,13 +849,9 @@ function eraBlock(s) {
   return null;
 }
 
-/* The full reason is printed once, in the picker head, where it stays on
-   screen next to every blocked row rather than being repeated four times. */
-const CAP_REASON = 'All three slots are in use — uncheck one to swap this in.';
-
 /* ── selection state: stable slots, so removing one reference never
    recolours the others ──────────────────────────────────────────────────── */
-const slots = [null, null, null];
+const slots = SLOTS.map(function () { return null; });
 const chosen = () => slots.map((id, i) => id ? { s: byId.get(id), slot: SLOTS[i] } : null).filter(Boolean);
 
 (function seed() {
@@ -732,6 +860,9 @@ const chosen = () => slots.map((id, i) => id ? { s: byId.get(id), slot: SLOTS[i]
   if (first) slots[0] = first;
 })();
 
+/* No cap. There are as many slots as there are strategies, so every reference
+   can be drawn at once; if that is too busy the reader unticks one. Slots are
+   positional and stable, so removing one reference never recolours the rest. */
 function toggle(id) {
   const at = slots.indexOf(id);
   if (at >= 0) { slots[at] = null; return; }
@@ -747,13 +878,23 @@ function toggle(id) {
    you cannot choose says why, inline, always. */
 const refEls = new Map();
 
-function keyLine(svg, color, dash) {
+/* The rail key is the stroke, at full size: same colour, weight, cap and dash
+   values the chart uses, over 44px. Nothing is normalised, because
+   normalising is what makes a long dash and a medium dash look alike —
+   scale every pattern to the same number of repeats and the only thing left
+   distinguishing them is gone. 44px is chosen as the shortest run in which
+   every one of the seven patterns states itself: the longest cycle here is
+   36px, so even that one shows a full dash, a full gap and the start of the
+   next. */
+function keyLine(svg, slot) {
   svg.textContent = '';
   const ln = document.createElementNS(NS, 'line');
-  ln.setAttribute('x1', 0); ln.setAttribute('x2', 28);
+  ln.setAttribute('x1', 1); ln.setAttribute('x2', 45);
   ln.setAttribute('y1', 5); ln.setAttribute('y2', 5);
-  ln.setAttribute('stroke', color); ln.setAttribute('stroke-width', 2);
-  if (dash) ln.setAttribute('stroke-dasharray', dash);
+  ln.setAttribute('stroke', slot.color);
+  ln.setAttribute('stroke-width', slot.w);
+  ln.setAttribute('stroke-linecap', slot.cap);
+  if (slot.dash) ln.setAttribute('stroke-dasharray', slot.dash);
   svg.appendChild(ln);
 }
 /* Money in gets a filled swatch, not a stroke key: it is a different kind of
@@ -762,10 +903,10 @@ function keyArea(svg) {
   svg.textContent = '';
   const r = document.createElementNS(NS, 'rect');
   r.setAttribute('x', 0); r.setAttribute('y', 3.5);
-  r.setAttribute('width', 28); r.setAttribute('height', 6.5);
+  r.setAttribute('width', 46); r.setAttribute('height', 6.5);
   r.setAttribute('fill', 'var(--floor-fill)');
   const ln = document.createElementNS(NS, 'line');
-  ln.setAttribute('x1', 0); ln.setAttribute('x2', 28);
+  ln.setAttribute('x1', 0); ln.setAttribute('x2', 46);
   ln.setAttribute('y1', 3.5); ln.setAttribute('y2', 3.5);
   ln.setAttribute('stroke', FLOOR); ln.setAttribute('stroke-width', 1);
   svg.appendChild(r); svg.appendChild(ln);
@@ -786,8 +927,9 @@ let popTimer = null;
 function closePop() {
   if (!popOpen) return;
   popOpen.panel.hidden = true;
-  popOpen.panel.removeAttribute('data-flip');
   popOpen.btn.setAttribute('aria-expanded', 'false');
+  const row = popOpen.btn.closest('.ref');
+  if (row) row.removeAttribute('data-pop');
   popOpen = null;
 }
 
@@ -797,17 +939,24 @@ function showPop(btn, panel, pinned) {
   panel.hidden = false;
   btn.setAttribute('aria-expanded', 'true');
   popOpen = { btn: btn, panel: panel, pinned: !!pinned };
-  /* A panel that would hang off the end of its own list lands on whatever
-     comes next — a section heading, the edge of the window — and reads as a
-     mistake. Where the list has the height for it, open upward instead and
-     cover rows, which is what an overlay is for. */
-  const list = panel.closest('ul');
+
+  /* It always opens downward, attached to its own row. Three things then say
+     which row it belongs to and none of them is inference from position: the
+     panel shares the row's bottom border, the row takes a solid border, and a
+     notch points up at the button that was pressed. The old upward flip put a
+     caution directly under the PREVIOUS row's name, which read as that row's
+     caution — the exact confusion this replaces. */
+  const row = btn.closest('.ref');
+  if (row) {
+    row.setAttribute('data-pop', panel.classList.contains('is-caution') ? 'caution' : 'open');
+    const rr = row.getBoundingClientRect();
+    const br = btn.getBoundingClientRect();
+    panel.style.setProperty('--notch-x', (br.left - rr.left + br.width / 2) + 'px');
+  }
+  /* If it would fall below the fold, scroll the page rather than move the
+     panel. Scrolling moves the viewport; it does not move the layout. */
   const pr = panel.getBoundingClientRect();
-  const br = btn.getBoundingClientRect();
-  const lr = list ? list.getBoundingClientRect() : null;
-  const overhangs = (lr && pr.bottom > lr.bottom + 2) || pr.bottom > window.innerHeight - 8;
-  const roomAbove = lr && br.top - lr.top >= pr.height + 10;
-  if (overhangs && roomAbove) panel.setAttribute('data-flip', 'up');
+  if (pr.bottom > window.innerHeight - 8) panel.scrollIntoView({ block: 'nearest' });
 }
 
 function schedulePopClose() {
@@ -920,7 +1069,7 @@ function buildRow(host, id, label, explainer, caution) {
 
   const key = document.createElementNS(NS, 'svg');
   key.setAttribute('class', 'ref-key');
-  key.setAttribute('viewBox', '0 0 28 10');
+  key.setAttribute('viewBox', '0 0 46 10');
   key.setAttribute('aria-hidden', 'true');
   line.appendChild(key);
 
@@ -986,31 +1135,26 @@ function paintRefs() {
   money.li.setAttribute('data-state', showMoneyIn ? 'on' : 'off');
   if (showMoneyIn) keyArea(money.key); else money.key.textContent = '';
 
-  const full = slots.indexOf(null) < 0;
   D.strategies.forEach(function (s) {
     const el = refEls.get(s.id);
     const at = slots.indexOf(s.id);
+    /* The only reason a row can now be unavailable is that the fund did not
+       exist for the whole of this history. That is a property of the strategy
+       and never changes while the page is open, so the inline reason it prints
+       is fixed furniture and can never move the row below it. */
     const era = eraBlock(s);
     const on = at >= 0;
-    const blocked = !!era || (!on && full);
 
     el.box.checked = on;
-    el.box.disabled = blocked;
-    el.li.setAttribute('data-state', on ? 'on' : blocked ? 'blocked' : 'off');
+    el.box.disabled = !!era;
+    el.li.setAttribute('data-state', on ? 'on' : era ? 'blocked' : 'off');
 
-    if (on) keyLine(el.key, SLOTS[at].color, SLOTS[at].dash);
+    if (on) keyLine(el.key, SLOTS[at]);
     else el.key.textContent = '';
 
-    const why = era || (blocked ? CAP_REASON : null);
-    el.reason.hidden = !why;
-    el.reason.textContent = why || '';
+    el.reason.hidden = !era;
+    el.reason.textContent = era || '';
   });
-
-  const count = chosen().length;
-  document.getElementById('slot-count').textContent = count === MAX_REFS
-    ? 'all ' + MAX_REFS + ' reference slots used'
-    : count + ' of ' + MAX_REFS + ' reference slots used';
-  document.getElementById('cap-note').hidden = count < MAX_REFS;
 }
 
 /* ── cautions, rendered for as long as the strategy is on the chart ─────── */
@@ -1021,17 +1165,11 @@ function paintCautions() {
     if (!c.s.caution) return;
     const box = document.createElement('div');
     box.className = 'caution-strip';
-
-    const key = document.createElementNS(NS, 'svg');
-    key.setAttribute('width', 26); key.setAttribute('height', 10);
-    key.setAttribute('viewBox', '0 0 26 10'); key.setAttribute('aria-hidden', 'true');
-    const ln = document.createElementNS(NS, 'line');
-    ln.setAttribute('x1', 0); ln.setAttribute('x2', 26);
-    ln.setAttribute('y1', 5); ln.setAttribute('y2', 5);
-    ln.setAttribute('stroke', c.slot.color); ln.setAttribute('stroke-width', 2);
-    if (c.slot.dash) ln.setAttribute('stroke-dasharray', c.slot.dash);
-    key.appendChild(ln);
-    box.appendChild(key);
+    /* The triangle, not the strategy's stroke. Terracotta is the user's own
+       line now as well as the attention colour, so nothing in a warning may
+       look like a line: this block is a filled outline carrying a glyph, and
+       the strategy it belongs to is named in words. */
+    box.appendChild(popIcon('caution'));
 
     const txt = document.createElement('p');
     txt.style.margin = '0';
@@ -1045,24 +1183,13 @@ function paintCautions() {
 }
 
 /* ── copy that follows the selection ────────────────────────────────────── */
+/* The lede no longer rewrites itself with the list of selected names. With
+   seven of them it ran to four lines and pushed the whole card — chart, rail
+   and every checkbox — down the page. The chart's own end labels and the rail
+   already name them; the accessible description below still carries the full
+   list for anyone not looking at the picture. */
 function paintCopy() {
   const c = chosen();
-  const refLabel = document.getElementById('ref-label');
-  const names = c.map(x => x.s.label);
-  const lede = document.getElementById('lede');
-  lede.textContent = '';
-  if (!names.length) {
-    lede.appendChild(document.createTextNode('How your money actually tracked, month by month — '));
-    refLabel.textContent = 'with no reference strategy chosen';
-    lede.appendChild(refLabel);
-    lede.appendChild(document.createTextNode('. Pick one from the panel beside the chart and it is drawn against your line, same money in, same money out, same months.'));
-  } else {
-    lede.appendChild(document.createTextNode('How your money actually tracked against just buying the boring thing — your balance against '));
-    refLabel.textContent = names.length === 1 ? names[0]
-      : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
-    lede.appendChild(refLabel);
-    lede.appendChild(document.createTextNode(', same money in, same money out, same months.'));
-  }
   document.getElementById('table-caption').textContent =
     'Every month in the period. Your value is shown only where you recorded a balance.';
 
@@ -1074,70 +1201,6 @@ function paintCopy() {
         signed(D.endingValue - x.s.endingValue)).join('; ') : ', with no reference strategy selected') +
     (showMoneyIn ? '. ' + MONEY_IN_LABEL + ' are drawn as a step beneath, ending at a net ' + usd2(netIn) +
       ', so the space between the two is a gain of ' + usd2(D.endingValue - netIn) : '') + '.';
-}
-
-/* legend — built with textContent, never innerHTML */
-function paintLegend() {
-  const host = document.getElementById('legend');
-  host.textContent = '';
-  const series = [{ name: 'Your portfolio', color: YOU.color, dash: null, dot: true, caution: false }]
-    .concat(chosen().map(c => ({
-      name: c.s.label, color: c.slot.color, dash: c.slot.dash, dot: false, caution: !!c.s.caution
-    })));
-  if (showMoneyIn) series.push({ name: MONEY_IN_LABEL, area: true, dot: false, caution: false });
-
-  series.forEach(function (s) {
-    const item = document.createElement('span');
-    item.className = 'legend-item';
-    const key = document.createElementNS(NS, 'svg');
-    key.setAttribute('class', 'legend-key');
-    key.setAttribute('viewBox', '0 0 26 10');
-    key.setAttribute('aria-hidden', 'true');
-    if (s.area) {
-      const r = document.createElementNS(NS, 'rect');
-      r.setAttribute('x', 0); r.setAttribute('y', 3.5);
-      r.setAttribute('width', 26); r.setAttribute('height', 6.5);
-      r.setAttribute('fill', 'var(--floor-fill)');
-      key.appendChild(r);
-      const edge = document.createElementNS(NS, 'line');
-      edge.setAttribute('x1', 0); edge.setAttribute('x2', 26);
-      edge.setAttribute('y1', 3.5); edge.setAttribute('y2', 3.5);
-      edge.setAttribute('stroke', FLOOR); edge.setAttribute('stroke-width', 1);
-      key.appendChild(edge);
-    } else {
-      const ln = document.createElementNS(NS, 'line');
-      ln.setAttribute('x1', 0); ln.setAttribute('x2', 26);
-      ln.setAttribute('y1', 5); ln.setAttribute('y2', 5);
-      ln.setAttribute('stroke', s.color); ln.setAttribute('stroke-width', 2);
-      if (s.dash) ln.setAttribute('stroke-dasharray', s.dash);
-      key.appendChild(ln);
-    }
-    if (s.dot) {
-      const c = document.createElementNS(NS, 'circle');
-      c.setAttribute('cx', 13); c.setAttribute('cy', 5); c.setAttribute('r', 3.5);
-      c.setAttribute('fill', s.color);
-      c.setAttribute('stroke', 'var(--surface)'); c.setAttribute('stroke-width', 2);
-      key.appendChild(c);
-    }
-    item.appendChild(key);
-    const label = document.createElement('span');
-    label.textContent = s.name;
-    item.appendChild(label);
-    if (s.caution) {
-      const tag = document.createElement('span');
-      tag.className = 'legend-tag';
-      tag.textContent = 'caution';
-      item.appendChild(tag);
-    }
-    host.appendChild(item);
-  });
-
-  if (!chosen().length) {
-    const note = document.createElement('span');
-    note.className = 'legend-item is-blank';
-    note.textContent = 'No reference selected — this is only your own balance.';
-    host.appendChild(note);
-  }
 }
 
 /* footer meta + data-quality state */
@@ -1161,22 +1224,47 @@ function paintFoot() {
   });
 }
 
+/* Data quality. The engine's own warnings, verbatim — they say what the
+   numbers can and cannot support, and they are long. Left in the flow above
+   the chart they were a wall of text before anything useful; so the count sits
+   on a control in the head, `granularity` stays on the meta line where it is
+   always visible, and the text opens into a panel at the very bottom of the
+   card. Nothing the reader aims at is below it, so opening it cannot move a
+   control or the plot. */
 (function buildWarnings() {
   const warnings = (D.dataQuality.warnings || []).slice();
   if (D.dataQuality.balanceCount < 3) {
     warnings.unshift('Only ' + D.dataQuality.balanceCount + ' balance rows. The shape of your line between them is unknown, and the annual figures are rough.');
   }
-  if (warnings.length) {
-    const box = document.getElementById('dq-warning');
-    box.hidden = false;
-    warnings.forEach(function (w) {
-      const p = document.createElement('p');
-      p.className = 'warn';
-      p.style.margin = '0 0 10px';
-      p.textContent = w;
-      box.appendChild(p);
-    });
-  }
+  const btn = document.getElementById('dq-toggle');
+  const panel = document.getElementById('dq-panel');
+  if (!warnings.length) { btn.remove(); panel.remove(); return; }
+
+  btn.hidden = false;
+  document.getElementById('dq-count').textContent = warnings.length;
+  btn.setAttribute('aria-label', warnings.length + ' notes on how precise this data is');
+
+  const head = document.createElement('p');
+  head.className = 'label';
+  head.textContent = 'How precise this is';
+  panel.appendChild(head);
+  const lead = document.createElement('p');
+  lead.className = 'dq-note';
+  lead.textContent = 'Your balances are ' + D.dataQuality.granularity + '. ' +
+    'Everything below comes from the engine that computed the chart, unedited.';
+  panel.appendChild(lead);
+  warnings.forEach(function (w) {
+    const p = document.createElement('p');
+    p.className = 'dq-note';
+    p.textContent = w;
+    panel.appendChild(p);
+  });
+
+  btn.addEventListener('click', function () {
+    const open = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', String(!open));
+    panel.hidden = open;
+  });
 })();
 
 /* ── the chart ──────────────────────────────────────────────────────────── */
@@ -1199,13 +1287,16 @@ function render() {
   const tiny = W < 460, narrow = W < 700, mid = W < 900;
   const H = narrow ? 340 : (mid ? 480 : 440);
   /* The gutter carries the end labels. With the picker beside the plot the
-     plot is narrower, so the gutter shrinks and the names shorten with it. The
-     money line's own label is a phrase, not a word: it takes a little more
-     gutter when it is drawn, and it wraps onto two lines rather than being
-     given a third name nobody would recognise. */
+     plot is narrower, so the gutter shrinks and the names shorten with it.
+
+     It is sized for the WIDEST thing that can ever go in it, not for what is
+     in it now. It used to be 14px narrower when contributions were switched
+     off, which meant the plot area itself changed width the moment the reader
+     hit that toggle — a click target and a crosshair surface moving under the
+     pointer. Reserve the space instead. */
   const M = {
     top: 28,
-    right: tiny ? (showMoneyIn ? 92 : 78) : (narrow ? (showMoneyIn ? 114 : 100) : (mid ? 152 : 200)),
+    right: tiny ? 112 : (narrow ? 114 : (mid ? 152 : 200)),
     bottom: 46,
     left: narrow ? 54 : 72
   };
@@ -1229,6 +1320,13 @@ function render() {
     role: 'img', tabindex: '0',
     'aria-labelledby': 'chart-title', 'aria-describedby': 'chart-desc'
   });
+
+  /* The chart sits on the raised surface rather than the page. It is this
+     brand's sanctioned way to lift a panel — no shadow — and it is doing real
+     work here: it takes terracotta from 2.94:1 to 3.15:1 and stone from 2.99
+     to 3.20, which is the difference between two of the nine strokes clearing
+     the contrast floor and not. */
+  svg.appendChild(S('rect', { x: 0, y: 0, width: W, height: H, fill: 'var(--plot-surface)' }));
 
   /* horizontal gridlines + y ticks (recessive, solid hairlines) */
   for (let v = 0; v <= yMax; v += step) {
@@ -1277,8 +1375,8 @@ function render() {
   /* reference lines — continuous, no markers, one stroke pattern each */
   picked.forEach(function (c) {
     svg.appendChild(S('polyline', {
-      fill: 'none', stroke: c.slot.color, 'stroke-width': 2,
-      'stroke-linejoin': 'round', 'stroke-linecap': c.slot.dash ? 'butt' : 'round',
+      fill: 'none', stroke: c.slot.color, 'stroke-width': c.slot.w,
+      'stroke-linejoin': 'round', 'stroke-linecap': c.slot.cap,
       'stroke-dasharray': c.slot.dash,
       points: c.s.path.map((v, i) => x(i) + ',' + y(v)).join(' ')
     }));
@@ -1289,14 +1387,14 @@ function render() {
   const obsPts = [];
   for (let i = 0; i < n; i++) { const v = yourAt(i); if (v !== null) obsPts.push([i, v]); }
   svg.appendChild(S('polyline', {
-    fill: 'none', stroke: 'var(--series-you)', 'stroke-width': 2,
+    fill: 'none', stroke: YOU.color, 'stroke-width': YOU.w,
     'stroke-linejoin': 'round', 'stroke-linecap': 'round',
     points: obsPts.map(p => x(p[0]) + ',' + y(p[1])).join(' ')
   }));
   obsPts.forEach(function (p) {
     svg.appendChild(S('circle', {
-      cx: x(p[0]), cy: y(p[1]), r: 3.5, fill: 'var(--series-you)',
-      stroke: 'var(--surface)', 'stroke-width': 2
+      cx: x(p[0]), cy: y(p[1]), r: 3.6, fill: YOU.color,
+      stroke: 'var(--plot-surface)', 'stroke-width': 2
     }));
   });
 
@@ -1305,16 +1403,46 @@ function render() {
   const labels = picked.map(c => ({
     yv: c.s.endingValue, color: c.slot.color,
     name: tiny ? (TINY[c.s.id] || c.s.label) : mid ? (SHORT[c.s.id] || c.s.label) : c.s.label
-  })).concat([{ yv: D.endingValue, color: YOU.color, name: narrow ? 'You' : 'Your portfolio' }])
-    .concat(showMoneyIn ? [{ yv: netIn, color: 'var(--floor-line)',
+  })).concat([{ yv: D.endingValue, color: YOU.color, you: true, name: narrow ? 'You' : 'Your portfolio' }])
+    .concat(showMoneyIn ? [{ yv: netIn, color: 'var(--floor-line)', money: true,
       name: narrow ? ['Net', 'contributions'] : ['Contributions &', 'withdrawals'] }] : [])
     .map(l => ({ ...l, y0: y(l.yv) }));
 
-  /* keep them apart without detaching them from their lines */
-  const blockH = (tiny ? 30 : 34) + (showMoneyIn ? (tiny ? 9 : 10) : 0);
+  /* Nine of these can be stacked in the gutter at once, and the worst case is
+     all nine wanting the same y. Rather than let them collide, or grow the
+     plot (which would move everything under it), the block shrinks to whatever
+     the reserved plot height can actually hold: the largest step whose full
+     stack fits, down to a floor below which it would not be legible. Past that
+     floor the anti-collision spacing still clamps them inside the plot, and
+     the honest answer is that the reader has selected more lines than the
+     gutter can name — which is what the rail is for. */
+  const STEPS = [
+    { v: 17, n: 9, line: 10, h: 34 },
+    { v: 15, n: 9, line: 10, h: 31 },
+    { v: 14, n: 8, line: 9,  h: 27 },
+    { v: 13, n: 8, line: 9,  h: 24 }
+  ];
   labels.sort((a, b) => a.y0 - b.y0);
+  const linesOf = l => (Array.isArray(l.name) ? l.name.length : 1);
+  /* The gap a label needs is its OWN height, not the tallest label's — only
+     the two-line money name needs the extra row, and only from whatever sits
+     under it. The label at the bottom of the stack needs no gap after it at
+     all, which is what lets nine of them fit at 640. */
+  const stack = t => labels.slice(0, -1)
+    .reduce((a, l) => a + t.h + (linesOf(l) - 1) * t.line, 0);
+  let type = STEPS[tiny ? 2 : (labels.length > 2 ? 1 : 0)];
+  for (let k = STEPS.indexOf(type); k < STEPS.length && stack(type) > plotH; k++) type = STEPS[k];
+  if (stack(type) > plotH) {
+    /* Last resort before letting them collide: the money line's second row.
+       'Net contributions' on one line is the same words, not a new name. */
+    const m = labels.find(l => l.money);
+    if (m) m.name = MONEY_IN_SHORT;
+  }
   let ly = labels.map(l => l.y0);
-  for (let i = 1; i < ly.length; i++) if (ly[i] - ly[i - 1] < blockH) ly[i] = ly[i - 1] + blockH;
+  for (let i = 1; i < ly.length; i++) {
+    const need = type.h + (linesOf(labels[i - 1]) - 1) * type.line;
+    if (ly[i] - ly[i - 1] < need) ly[i] = ly[i - 1] + need;
+  }
   const overflow = ly[ly.length - 1] - (M.top + plotH);
   if (overflow > 0) ly = ly.map(v => v - overflow);
   if (ly.length && ly[0] < M.top + 10) { const up = M.top + 10 - ly[0]; ly = ly.map(v => v + up); }
@@ -1328,16 +1456,26 @@ function render() {
       fill: 'none', stroke: l.color, 'stroke-width': 1,
       'stroke-dasharray': '1 3', opacity: 0.85
     }));
-    svg.appendChild(S('circle', { cx: lx, cy: l.y0, r: 3.5, fill: l.color, stroke: 'var(--surface)', 'stroke-width': 2 }));
+    svg.appendChild(S('circle', {
+      cx: lx, cy: l.y0, r: l.you ? 4.2 : 3.5, fill: l.color,
+      stroke: 'var(--plot-surface)', 'stroke-width': 2
+    }));
+    /* The figure is tinted to its series — that is the tie back to the line.
+       The name beneath it is not: it is set in --muted (5.8:1 on this surface)
+       because a 9px uppercase run in gold or moss is not readable, and the
+       WORDS already identify the series. Colour is asked to do only the job it
+       can do at that size. */
     svg.appendChild(S('text', {
       class: 'end-value', x: tx, y: ly[i], fill: l.color, 'text-anchor': 'start',
-      'font-size': tiny ? 14 : (labels.length > 2 ? 15 : 17)
+      'font-weight': l.you ? 500 : 400,
+      'font-size': tiny ? 14 : type.v
     }, tiny ? '$' + nf(Math.round(l.yv / 1000)) + 'k' : usd(l.yv)));
     const nameLines = Array.isArray(l.name) ? l.name : [l.name];
     nameLines.forEach(function (t, k) {
       svg.appendChild(S('text', {
-        class: 'end-name', x: tx, y: ly[i] + (tiny ? 13 : 14) + k * (tiny ? 9 : 10), fill: l.color,
-        'text-anchor': 'start', 'font-size': tiny ? 8 : 9
+        class: 'end-name', x: tx, y: ly[i] + type.n + 4 + k * type.line,
+        fill: l.you ? 'var(--ink)' : 'var(--muted)',
+        'text-anchor': 'start', 'font-size': type.n
       }, t));
     });
   });
@@ -1346,10 +1484,10 @@ function render() {
   const cross = S('g', { id: 'crosshair', opacity: 0, 'pointer-events': 'none' });
   cross.appendChild(S('line', { id: 'cross-line', y1: M.top, y2: M.top + plotH, stroke: 'var(--muted)', 'stroke-width': 1, 'stroke-dasharray': '2 4' }));
   picked.forEach(function (c, i) {
-    cross.appendChild(S('circle', { class: 'cross-ref', 'data-slot': i, r: 4.5, fill: c.slot.color, stroke: 'var(--surface)', 'stroke-width': 2 }));
+    cross.appendChild(S('circle', { class: 'cross-ref', 'data-slot': i, r: 4.5, fill: c.slot.color, stroke: 'var(--plot-surface)', 'stroke-width': 2 }));
   });
-  if (showMoneyIn) cross.appendChild(S('circle', { id: 'cross-floor', r: 4, fill: 'var(--floor-line)', stroke: 'var(--surface)', 'stroke-width': 2 }));
-  cross.appendChild(S('circle', { id: 'cross-you', r: 4.5, fill: 'var(--series-you)', stroke: 'var(--surface)', 'stroke-width': 2 }));
+  if (showMoneyIn) cross.appendChild(S('circle', { id: 'cross-floor', r: 4, fill: 'var(--floor-line)', stroke: 'var(--plot-surface)', 'stroke-width': 2 }));
+  cross.appendChild(S('circle', { id: 'cross-you', r: 5, fill: YOU.color, stroke: 'var(--plot-surface)', 'stroke-width': 2 }));
   svg.appendChild(cross);
 
   /* one big hit area — the crosshair finds the X, the reader aims at a date */
@@ -1426,18 +1564,18 @@ function showAt(i) {
   tip.appendChild(month);
 
   const carried = youV === null ? lastObsBefore(i) : null;
-  addRow(YOU.color, null, youV === null ? '—' : usd2(youV), 'Your portfolio',
+  addRow(YOU, youV === null ? '—' : usd2(youV), 'Your portfolio',
     youV === null ? (carried ? 'no balance recorded · last: ' + usd(carried.v) + ', ' + monthOf(D.months[carried.i]) : 'no balance recorded yet') : null);
 
   if (showMoneyIn) {
-    addRow(FLOOR, null, usd2(moneyIn[i]), MONEY_IN_LABEL,
+    addRow({ color: FLOOR, dash: null, cap: 'butt', w: 1 }, usd2(moneyIn[i]), MONEY_IN_LABEL,
       youV === null ? null : 'gain ' + signed(youV - moneyIn[i]), true);
   }
 
   /* One reference keeps the original footer row. More than one and a footer
      per series is noise, so each carries its own gap on the line beneath it. */
   picked.forEach(function (p) {
-    addRow(p.slot.color, p.slot.dash, usd2(p.s.path[i]), p.s.label,
+    addRow(p.slot, usd2(p.s.path[i]), p.s.label,
       picked.length > 1 && youV !== null ? 'you ' + signed(youV - p.s.path[i]) + ' against this' : null);
   });
   if (picked.length === 1) {
@@ -1485,25 +1623,33 @@ function showAt(i) {
   tip.style.top = top + 'px';
   tip.setAttribute('data-show', '1');
 
-  function addRow(color, dash, value, name, note, area) {
+  function addRow(slot, value, name, note, area) {
     const row = document.createElement('div');
     row.className = 'tip-row';
     const key = document.createElementNS(NS, 'svg');
     key.setAttribute('class', 'tip-key');
-    key.setAttribute('viewBox', '0 0 16 2');
+    key.setAttribute('viewBox', '0 0 36 2');
     key.setAttribute('aria-hidden', 'true');
     if (area) {
       const r = document.createElementNS(NS, 'rect');
       r.setAttribute('x', 0); r.setAttribute('y', 0.4);
-      r.setAttribute('width', 16); r.setAttribute('height', 1.6);
+      r.setAttribute('width', 36); r.setAttribute('height', 1.6);
       r.setAttribute('fill', 'var(--floor-fill)');
       key.appendChild(r);
     }
     const ln = document.createElementNS(NS, 'line');
-    ln.setAttribute('x1', 0); ln.setAttribute('x2', 16);
+    ln.setAttribute('x1', 0); ln.setAttribute('x2', 36);
     ln.setAttribute('y1', area ? 0.4 : 1); ln.setAttribute('y2', area ? 0.4 : 1);
-    ln.setAttribute('stroke', color); ln.setAttribute('stroke-width', area ? 0.8 : 2);
-    if (dash) ln.setAttribute('stroke-dasharray', dash);
+    ln.setAttribute('stroke', slot.color);
+    ln.setAttribute('stroke-width', area ? 0.8 : Math.min(2.4, slot.w));
+    /* The tooltip key is 36px against the rail's 44, so every pattern is
+       scaled by the same 0.8 — one factor for all of them, which shrinks the
+       run without flattening the differences between the patterns. Butt caps
+       here: at this size a round cap on a 2.4px stroke closes the narrower
+       gaps and turns dash-dot-dot back into a solid line. */
+    ln.setAttribute('stroke-linecap', 'butt');
+    if (slot.dash) ln.setAttribute('stroke-dasharray',
+      slot.dash.split(' ').map(v => +(+v * 0.8).toFixed(2)).join(' '));
     key.appendChild(ln);
     const v = document.createElement('span');
     v.className = value === '—' ? 'tip-val is-empty' : 'tip-val';
@@ -1582,7 +1728,6 @@ function update(announce, msg) {
   paintRefs();
   paintCautions();
   paintCopy();
-  paintLegend();
   paintFoot();
   buildTable();
   hide();
@@ -1593,8 +1738,7 @@ function update(announce, msg) {
     const c = chosen();
     document.getElementById('sel-live').textContent = msg || (c.length
       ? c.length + ' reference ' + (c.length === 1 ? 'strategy' : 'strategies') + ' shown: ' +
-        c.map(x => x.s.label + (x.s.caution ? ' (carries a caution)' : '')).join(', ') +
-        (slots.indexOf(null) < 0 ? '. All three slots are now full.' : '')
+        c.map(x => x.s.label + (x.s.caution ? ' (carries a caution)' : '')).join(', ') + '.'
       : 'No reference strategy shown. The chart now has only your own balance.');
   }
 }
