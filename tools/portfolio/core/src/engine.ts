@@ -36,6 +36,13 @@ export interface PortfolioInput {
   currentAge?: number;
   /** Optional: enables the target-date-mismatch check. */
   statedTargetYear?: number;
+  /**
+   * Optional: the US share of global equity market capitalisation to compare
+   * holdings against, as a fraction. Supply this to override the value derived
+   * from the benchmark data — a user may hold a different, defensible view of
+   * what "market weight" means, and this is a judgement input, not a fact.
+   */
+  usMarketWeight?: number;
 }
 
 /** Monthly returns keyed `YYYY-MM`; annual keyed `YYYY`. Values are percent. */
@@ -298,11 +305,91 @@ export function findFlowFreeWindows(
  * Mechanical checks. Each of these was a judgement call made by hand during
  * the original analysis; all of them turn out to be rules.
  */
+/** Where a market-weight figure came from, so the UI can say so. */
+export interface MarketWeight {
+  /** US share of global equity market capitalisation, as a fraction. */
+  usEquity: number;
+  /** `YYYY-MM` the estimate is anchored to, or null for the fallback. */
+  asOf: string | null;
+  source: 'derived' | 'user' | 'fallback';
+  /** Months of data behind a derived estimate. */
+  months?: number;
+}
+
+/**
+ * Used only when the benchmark data cannot support a derived estimate. This is
+ * the figure `SPEC.md` quotes; it is roughly right for the mid-2020s and
+ * materially wrong for earlier periods, which is precisely why it should not be
+ * a constant.
+ */
+export const FALLBACK_US_MARKET_WEIGHT = 0.63;
+
+/** Deviation from market weight, in percentage points, that counts as a tilt. */
+export const REGIONAL_TILT_THRESHOLD = 0.15;
+
+/**
+ * Estimate the US share of global equity market capitalisation from the shipped
+ * benchmark series.
+ *
+ * `GLOBAL_EQUITY` is cap-weighted, so over any window its return is
+ * approximately `w * US_TOTAL + (1 - w) * INTL_TOTAL`. Least squares on
+ * `g - i = w * (u - i)` recovers `w` without needing a market-cap source.
+ *
+ * This is inference from return correlation, NOT a sourced market-cap figure.
+ * It is accurate to roughly a percentage point, which is fine for a threshold
+ * check and would not be fine for anything quoted as a fact. Prefer index
+ * factsheet weights if they are ever added to the data.
+ *
+ * The weight is anchored to `asOf` because it moves: it sat near 0.60 in 2022
+ * and near 0.63 in 2025, and was far lower before 2010. A single constant is
+ * wrong over any long window.
+ *
+ * Returns null when fewer than 12 usable months precede `asOf`.
+ */
+export function impliedUsMarketWeight(
+  data: BenchmarkData,
+  asOf?: string,
+  windowMonths = 60,
+): MarketWeight | null {
+  const g = data.monthly['GLOBAL_EQUITY'];
+  const u = data.monthly['US_TOTAL'];
+  const i = data.monthly['INTL_TOTAL'];
+  if (!g || !u || !i) return null;
+
+  let keys = Object.keys(g)
+    .filter((k) => k in u && k in i)
+    .sort();
+  if (asOf) keys = keys.filter((k) => k <= asOf);
+  keys = keys.slice(-windowMonths);
+  if (keys.length < 12) return null;
+
+  let num = 0;
+  let den = 0;
+  for (const k of keys) {
+    const x = u[k] - i[k];
+    num += x * (g[k] - i[k]);
+    den += x * x;
+  }
+  if (den === 0) return null;
+
+  const w = num / den;
+  // Guard against a degenerate fit on thin or pathological data.
+  if (!Number.isFinite(w) || w < 0.2 || w > 0.9) return null;
+
+  return {
+    usEquity: w,
+    asOf: keys[keys.length - 1],
+    source: 'derived',
+    months: keys.length,
+  };
+}
+
 export function deriveFindings(
   input: PortfolioInput,
   you: { xirr: number; annual: Record<string, number> },
   ref: StrategyResult,
   capture: AnalysisResult['capture'],
+  marketWeight: MarketWeight,
 ): Finding[] {
   const f: Finding[] = [];
 
@@ -370,14 +457,17 @@ export function deriveFindings(
     const us = eq.filter((p) => p.assetClass === 'us_equity').reduce((s, p) => s + p.value, 0);
     if (total > 0) {
       const usShare = us / total;
-      if (Math.abs(usShare - 0.63) > 0.15) {
+      const mw = marketWeight.usEquity;
+      if (Math.abs(usShare - mw) > REGIONAL_TILT_THRESHOLD) {
         f.push({
           id: 'regional-tilt',
           severity: 'info',
           title: `Your equity is ${(usShare * 100).toFixed(0)}% US`,
           detail:
-            `Global market weight is roughly 63% US. A deviation this size is a deliberate bet ` +
-            `on one region — it may pay off or not, but it is a choice someone made.`,
+            `Global market weight is roughly ${(mw * 100).toFixed(0)}% US` +
+            `${marketWeight.asOf ? ` as of ${marketWeight.asOf}` : ''}. ` +
+            `A deviation this size is a deliberate bet on one region — it may pay off or ` +
+            `not, but it is a choice someone made.`,
         });
       }
       const usEq = eq.filter((p) => p.assetClass === 'us_equity');
