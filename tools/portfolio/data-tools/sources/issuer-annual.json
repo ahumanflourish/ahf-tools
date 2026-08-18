@@ -1,0 +1,28 @@
+{
+ "_what": "Calendar-year TOTAL RETURNS taken directly from the issuer's SEC filings. Used as ground truth for series that benchmarks.json does not carry an annual row for. Not shipped to the browser.",
+ "_provenance": [
+  "GLOBAL_EQUITY = Vanguard Total World Stock Index Fund ETF Shares (VT), series S000022482, share class C000065038.",
+  "2009-2013 from the XBRL risk/return instance of 485BPOS filed 2014-02-27, accession 0000932471-14-004982 (CIK 0000857489), rr:AnnualReturn2009..2013.",
+  "2014-2021 from the XBRL risk/return instance of 485BPOS filed 2022-02-25, accession 0001683863-22-001067 (CIK 0000857489), rr:AnnualReturn2014..2021.",
+  "The two filings agree on their overlapping years (2012: 17.33, 2013: 22.98), which is the cross-filing consistency check.",
+  "Basis: fund total return based on NAV. The monthly VT series is market-price total return; the same 2022 filing prices that difference at 1-6bp annualised (1yr 18.25 NAV vs 18.24 market, 5yr 14.45 vs 14.48, 10yr 12.14 vs 12.08).",
+  "Total-return confirmation: these are the prospectus 'Annual Total Returns' bar-chart values, which the Investment Company Act risk/return taxonomy defines as total return with distributions reinvested. Independently confirmed by reconciliation - twelve monthly returns compound onto them to within 33bp for every year 2010-2020."
+ ],
+ "annual": {
+  "GLOBAL_EQUITY": {
+   "2009": 33.62,
+   "2010": 13.05,
+   "2011": -7.71,
+   "2012": 17.33,
+   "2013": 22.98,
+   "2014": 3.97,
+   "2015": -1.88,
+   "2016": 8.77,
+   "2017": 24.19,
+   "2018": -9.67,
+   "2019": 26.8,
+   "2020": 16.74,
+   "2021": 18.25
+  }
+ }
+}
