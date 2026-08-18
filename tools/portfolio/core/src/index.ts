@@ -34,6 +34,7 @@ export type {
   BenchmarkData,
   StrategyDef,
   StrategyResult,
+  PeriodInfo,
   Finding,
   AnalysisResult,
 } from './engine';

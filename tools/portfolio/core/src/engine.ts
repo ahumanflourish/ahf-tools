@@ -72,6 +72,45 @@ export interface StrategyResult {
   annual: Record<string, number>;
 }
 
+/**
+ * Metadata for one entry in `you.annual`.
+ *
+ * `you.annual` is keyed by calendar year, but the window it actually measures
+ * runs from the previous year's closing balance to this year's, so the first
+ * and last years are usually stubs covering only part of the year. Those
+ * returns are NOT annualised — each is the raw return over `days`. Anything
+ * that compares periods with one another, or renders them side by side, needs
+ * to know which are stubs, which is what this record carries.
+ */
+export interface PeriodInfo {
+  /** Date of the opening balance. ISO `YYYY-MM-DD`. */
+  start: string;
+  /** Date of the closing balance. ISO `YYYY-MM-DD`. */
+  end: string;
+  /** Calendar days from `start` to `end`. */
+  days: number;
+  /** True when the window is materially shorter than a full calendar year. */
+  partial: boolean;
+}
+
+/**
+ * Day count at or above which a Modified Dietz period counts as a full year.
+ *
+ * JUDGEMENT CALL — the spec does not define this, so the number is chosen
+ * rather than derived. A full calendar-year window runs 365 or 366 days
+ * (previous year-end balance → this year-end balance). Stub periods are much
+ * shorter: the reference fixture's 2021 covers 61 days (2021-10-31 →
+ * 2021-12-31) and its 2026 covers 212 (2025-12-31 → 2026-07-31).
+ *
+ * 330 days (~10.8 months) leaves roughly a month of slack, so a balance dated
+ * 2024-12-27 rather than 2024-12-31 — or a history opening on 2021-01-08 —
+ * still measures as a full year, while any genuinely short stub is caught.
+ * Every real value in the fixture sits far from the boundary, so any cutoff
+ * between ~220 and ~360 classifies it identically; the exact figure is not
+ * load-bearing.
+ */
+const FULL_PERIOD_DAYS = 330;
+
 export interface Finding {
   id: string;
   severity: 'info' | 'caution' | 'notable';
@@ -86,6 +125,13 @@ export interface AnalysisResult {
   endingValue: number;
   gain: number;
   you: { xirr: number; annual: Record<string, number> };
+  /**
+   * Window metadata for each key of `you.annual`, same keys, same order.
+   * `you.annual` deliberately still reports every period including the stubs —
+   * the year-by-year visual shows all of them and footnotes the partial ones —
+   * so this is how a consumer tells a full year from a stub.
+   */
+  periods: Record<string, PeriodInfo>;
   strategies: StrategyResult[];
   /** The strategy used as the "boring passive option" reference. */
   referenceId: string;
@@ -303,6 +349,12 @@ export function deriveFindings(
   you: { xirr: number; annual: Record<string, number> },
   ref: StrategyResult,
   capture: AnalysisResult['capture'],
+  /**
+   * Window metadata from `analyse`. Optional so existing callers keep working;
+   * omitting it treats every period as a full year, which is the behaviour
+   * before partial periods were tracked.
+   */
+  periods: Record<string, PeriodInfo> = {},
 ): Finding[] {
   const f: Finding[] = [];
 
@@ -323,7 +375,13 @@ export function deriveFindings(
   }
 
   // 2. Upside/downside capture asymmetry
-  const years = Object.keys(you.annual);
+  //
+  // Full periods only. A stub period's return is the raw return over its own
+  // (short) window, un-annualised, so its capture ratio is not commensurate
+  // with a full year's and must not be averaged in alongside one. The stubs
+  // stay in `you.annual` — the year-by-year visual renders all six periods and
+  // footnotes the partial ones — they are excluded here and nowhere else.
+  const years = Object.keys(you.annual).filter((y) => !periods[y]?.partial);
   const up = years.filter((y) => (ref.annual[y] ?? 0) > 0);
   const down = years.filter((y) => (ref.annual[y] ?? 0) < 0);
   if (up.length >= 2 && down.length >= 1) {
@@ -454,6 +512,10 @@ export function analyse(
 
   // annual returns for the user, Modified Dietz
   const yourAnnual: Record<string, number> = {};
+  // Window actually measured for each of those years. Recorded because the
+  // first and last are typically stubs, and because the reference strategies
+  // below must be compounded over exactly these windows to be comparable.
+  const periods: Record<string, PeriodInfo> = {};
   const years = [...new Set(balances.map((b) => b.date.getUTCFullYear()))];
   for (const y of years) {
     const s = balances.filter((b) => b.date.getUTCFullYear() === y - 1).pop()
@@ -462,6 +524,13 @@ export function analyse(
     if (!s || !e || s.date >= e.date) continue;
     const yf = flows.filter((f) => f.date > s.date && f.date <= e.date);
     yourAnnual[String(y)] = modifiedDietz(s.value, e.value, yf, s.date, e.date);
+    const days = daysBetween(s.date, e.date);
+    periods[String(y)] = {
+      start: s.date.toISOString().slice(0, 10),
+      end: e.date.toISOString().slice(0, 10),
+      days,
+      partial: days < FULL_PERIOD_DAYS,
+    };
   }
 
   const results: StrategyResult[] = strategies.map((def) => {
@@ -470,9 +539,21 @@ export function analyse(
     const cf = [...flows.map((f) => ({ date: f.date, amount: -f.amount })),
                 { date: last, amount: ending }];
     const ann: Record<string, number> = {};
-    for (const y of Object.keys(yourAnnual)) {
+    for (const [y, p] of Object.entries(periods)) {
+      // Compound over the SAME window the user's Modified Dietz figure covers,
+      // not over the whole calendar year. A month counts when its end falls in
+      // (start, end]: the opening balance already reflects everything up to and
+      // including `start`, so crediting the reference with the month that
+      // closed on `start` would measure it over a period the user never held.
+      // Full years are unaffected — a 2021-12-31 → 2022-12-31 window selects
+      // exactly 2022-01…2022-12, which is what the calendar-year filter gave.
+      // Monthly is the finest granularity the benchmark data has, so a window
+      // boundary falling mid-month rounds to the whole month.
       let g = 1;
-      for (const mk of months.filter((m) => m.startsWith(y))) g *= 1 + series[mk] / 100;
+      for (const mk of months) {
+        const me = monthEnd(mk);
+        if (me > p.start && me <= p.end) g *= 1 + series[mk] / 100;
+      }
       ann[y] = g - 1;
     }
     return {
@@ -511,7 +592,7 @@ export function analyse(
   };
 
   const you = { xirr: yourXirr, annual: yourAnnual };
-  const findings = deriveFindings(input, you, ref, capture);
+  const findings = deriveFindings(input, you, ref, capture, periods);
 
   const spanMonths = months.length;
   const granularity: 'annual' | 'monthly' | 'sparse' =
@@ -533,7 +614,7 @@ export function analyse(
   return {
     netContributed, grossContributed, grossWithdrawn, endingValue,
     gain: endingValue - netContributed,
-    you, strategies: results, referenceId: ref.id, capture,
+    you, periods, strategies: results, referenceId: ref.id, capture,
     flowFreeWindows: findFlowFreeWindows(balances, flows),
     findings,
     dataQuality: {
