@@ -203,7 +203,17 @@ export interface AnalysisResult {
   grossContributed: number;
   grossWithdrawn: number;
   endingValue: number;
+  /**
+   * `endingValue` minus the capital that was put in — contributions net of
+   * withdrawals, plus `openingPosition`.
+   */
   gain: number;
+  /**
+   * Money already invested when the history opened, treated as such rather
+   * than as a contribution. Non-zero only when the input carries no flows at
+   * all, in which case it is the first balance. See `analyse`.
+   */
+  openingPosition: number;
   you: { xirr: number; annual: Record<string, number> };
   /**
    * Window metadata for each key of `you.annual`, same keys, same order.
@@ -267,6 +277,16 @@ export interface DataQuality {
    */
   largestGapMonths: number;
   flowCount: number;
+  /**
+   * ISO date of the first balance when it predates the first flow, else null.
+   *
+   * A non-null value means the analysis is measuring a return on money it has
+   * no record of arriving: `netContributed` excludes it, so it lands in `gain`
+   * and in `capture.kept` as though it were performance. INTERACTION.md makes
+   * resolving this a question for the user, not a silent conversion, so this
+   * is the signal to ask it.
+   */
+  balanceBeforeFirstFlow: string | null;
   granularity: Granularity;
   firstDate: string;
   lastDate: string;
@@ -493,6 +513,15 @@ export function dataQualityWarnings(args: {
   /** Every calendar year carrying at least one balance row. */
   balanceYears: number[];
   flowDates: Date[];
+  /**
+   * ISO date of the balance being treated as an opening position, when the
+   * input carries no flows at all. Optional: omitting it is the ordinary case.
+   */
+  openingPositionDate?: string | null;
+  /** ISO date of a first balance that predates the first flow, else null. */
+  balanceBeforeFirstFlow?: string | null;
+  /** ISO date of the first flow. Only read alongside the field above. */
+  firstFlowDate?: string | null;
 }): string[] {
   const { granularity, observedMonths, spanMonths, largestGapMonths, periods } = args;
   const out: string[] = [];
@@ -617,8 +646,124 @@ export function dataQualityWarnings(args: {
       'Real transaction dates will improve accuracy.');
   }
 
+  // 5. Lump sum. Not a defect in the data and not a warning about accuracy —
+  //    it is a statement of the assumption the analysis is running on, which
+  //    the user never made explicitly and can only disagree with if told.
+  if (args.openingPositionDate) {
+    out.push(
+      `No contributions or withdrawals were entered, so your first balance, dated ` +
+      `${args.openingPositionDate}, is treated as money already invested on that date, and ` +
+      `each reference strategy is given the same amount on the same day. Nothing was ` +
+      `contributed during the period, so figures expressed as a share of contributions do ` +
+      `not apply; the comparison is between what that opening amount became and what it ` +
+      `would have become.`);
+  }
+
+  // 6. A balance dated before the first flow. This one IS a defect: until the
+  //    user answers the question, the opening amount is being counted as gain.
+  if (args.balanceBeforeFirstFlow) {
+    out.push(
+      `Your first balance is dated ${args.balanceBeforeFirstFlow}, before your first ` +
+      `contribution${args.firstFlowDate ? ` on ${args.firstFlowDate}` : ''}. If that balance ` +
+      `was money already invested, it is not currently counted as money you put in, so your ` +
+      `return and the kept-versus-given-up figures both treat it as gain and overstate them. ` +
+      `Entering it as a contribution on that date would correct them; leave it as it is only ` +
+      `if the account really was empty until then.`);
+  }
+
   return out;
 }
+
+// ──────────────────────────────────────────────── input validation & coverage
+
+/**
+ * Codes for the conditions `analyse` refuses to compute on.
+ *
+ * Every one of these is a row in INTERACTION.md's "Error and edge states"
+ * table, and every one of them needs specific copy saying what to fix. A bare
+ * `Error` cannot carry that — the UI would have to match on message text — so
+ * the code and the facts the copy needs travel on the error itself.
+ */
+export type AnalysisErrorCode =
+  /** Fewer than two balance rows: nothing to measure a period between. */
+  | 'insufficient-balances'
+  /** No flows AND no opening balance to stand in for them. */
+  | 'no-invested-capital'
+  /** History opens before the monthly benchmark series does. */
+  | 'history-before-coverage'
+  /** History closes after the monthly benchmark series does. */
+  | 'history-after-coverage';
+
+/**
+ * Thrown by `analyse` for inputs it will not compute on.
+ *
+ * `instanceof AnalysisError` is the catchable contract; `code` selects the
+ * copy; the remaining fields are the facts that copy needs. INTERACTION.md
+ * requires the coverage cases to "name the earliest supported date and offer
+ * to analyse the covered portion", so `earliestSupported`, `latestSupported`,
+ * `coveredFrom` and `coveredTo` are populated for those two codes — the offer
+ * is the UI's to make, but it cannot make it without these.
+ */
+export class AnalysisError extends Error {
+  readonly code: AnalysisErrorCode;
+  /** First date the benchmark data supports, ISO. Coverage errors only. */
+  readonly earliestSupported?: string;
+  /** Last date the benchmark data supports, ISO. Coverage errors only. */
+  readonly latestSupported?: string;
+  /**
+   * The part of the user's own history that IS covered, ISO, or null when
+   * none of it is. Coverage errors only.
+   */
+  readonly coveredFrom?: string | null;
+  readonly coveredTo?: string | null;
+  /** Balance rows supplied. `insufficient-balances` only. */
+  readonly balanceCount?: number;
+
+  constructor(
+    code: AnalysisErrorCode,
+    message: string,
+    extra: Partial<Omit<AnalysisError, 'code' | 'name' | 'message'>> = {},
+  ) {
+    super(message);
+    this.name = 'AnalysisError';
+    this.code = code;
+    Object.assign(this, extra);
+  }
+}
+
+/**
+ * The span of months every series these strategies need is present for.
+ *
+ * `buildStrategySeries` throws a developer-facing `missing monthly X YYYY-MM`
+ * the moment it walks off the end of the data, which surfaces to a user as an
+ * uncaught crash. Computing the window up front turns that into the specific,
+ * catchable error INTERACTION.md asks for.
+ *
+ * Only the series the given strategies actually reference are considered: a
+ * catalogue entry nobody selected should not narrow anyone's supported range.
+ * Interior holes are not detected here — the shipped data has none, and
+ * `buildStrategySeries` remains the backstop if that ever changes.
+ */
+export function benchmarkCoverage(
+  data: BenchmarkData,
+  strategies: StrategyDef[],
+): { firstMonth: string; lastMonth: string } | null {
+  const ids = [...new Set(strategies.flatMap((d) => Object.keys(d.weights)))];
+  let firstMonth = '';
+  let lastMonth = '';
+  for (const id of ids) {
+    const keys = Object.keys(data.monthly[id] ?? {}).sort();
+    if (keys.length === 0) return null;
+    // Intersection: the latest start and the earliest end across the series.
+    if (!firstMonth || keys[0] > firstMonth) firstMonth = keys[0];
+    if (!lastMonth || keys[keys.length - 1] < lastMonth) lastMonth = keys[keys.length - 1];
+  }
+  if (!firstMonth || !lastMonth || firstMonth > lastMonth) return null;
+  return { firstMonth, lastMonth };
+}
+
+/** First calendar day of a `YYYY-MM`, as ISO. */
+const monthStart = (key: string): string => `${key}-01`;
 
 // ──────────────────────────────────────────────────────────── findings
 
@@ -877,20 +1022,123 @@ export function analyse(
     .map((r) => ({ date: toDate(r.date), value: r.amount }))
     .sort((a, b) => a.date.getTime() - b.date.getTime());
 
-  if (!flows.length || !balances.length) {
-    throw new Error('Need at least one contribution and one balance.');
+  // INTERACTION.md, "Error and edge states": fewer than two balance rows
+  // cannot be computed, and the copy must explain the minimum — one starting
+  // and one ending value. Note what is NOT required any more: contributions.
+  // "No contributions" is a legitimate shape (see `openingPosition` below),
+  // and the old combined guard rejected it.
+  if (balances.length < 2) {
+    throw new AnalysisError(
+      'insufficient-balances',
+      balances.length === 0
+        ? 'No balance rows. An analysis needs at least two balances — one starting ' +
+          'value and one ending value — so that there is a period to measure.'
+        : `Only one balance row (dated ${balances[0].date.toISOString().slice(0, 10)}). ` +
+          'An analysis needs at least two — one starting value and one ending value — ' +
+          'so that there is a period to measure.',
+      { balanceCount: balances.length },
+    );
   }
 
-  const first = flows[0].date < balances[0].date ? flows[0].date : balances[0].date;
+  /**
+   * Capital that was already invested when the history opens, as opposed to
+   * contributed during it.
+   *
+   * INTERACTION.md: "No contributions — Fine, treat as a lump sum already
+   * invested at the first balance." That is exactly and only what this is. It
+   * is NOT a synthetic contribution: it never enters `grossContributed`,
+   * `netContributed` or `dataQuality.flowCount`, all of which continue to
+   * report what the user actually did, which is nothing. It enters the
+   * return maths, where a valuation-dated inflow is the correct and standard
+   * way to open a money-weighted calculation, and it enters the capture
+   * framing as invested capital rather than as gain.
+   *
+   * Deliberately scoped to the no-flows case. A history that DOES have flows
+   * but opens with a balance dated before the first of them is a different
+   * INTERACTION.md row — "Ask whether that's an opening balance; offer to
+   * convert it" — an explicit user decision, so the engine flags it (see
+   * `dataQuality.balanceBeforeFirstFlow`) and does not convert it silently.
+   */
+  const openingPosition = flows.length === 0 ? balances[0].value : 0;
+
+  if (flows.length === 0 && openingPosition <= 0) {
+    throw new AnalysisError(
+      'no-invested-capital',
+      'No contributions or withdrawals were entered and the first balance is ' +
+        `${openingPosition}, so there is no invested capital to measure a return on. ` +
+        'Add the contributions, or an opening balance greater than zero.',
+    );
+  }
+
+  /**
+   * The flows the RETURN maths runs on: the user's own, plus the opening
+   * position when there is one. Everything the user is told they contributed
+   * comes from `flows`, never from this.
+   */
+  const modelFlows = openingPosition > 0
+    ? [{ date: balances[0].date, amount: openingPosition }, ...flows]
+    : flows;
+
+  const first = flows.length && flows[0].date < balances[0].date ? flows[0].date : balances[0].date;
   const last = balances[balances.length - 1].date;
   const endingValue = balances[balances.length - 1].value;
   const months = monthRange(ym(first), ym(last));
+
+  // INTERACTION.md: "History predates benchmark coverage — name the earliest
+  // supported date and offer to analyse the covered portion." Without this,
+  // `buildStrategySeries` throws `missing monthly GLOBAL_EQUITY 2019-01` from
+  // three frames down, which is a crash rather than an answer. The same guard
+  // catches the other end of the window, which the table does not mention and
+  // which fails identically: a history running to 2026-11 is just as far
+  // outside the data as one starting in 2019.
+  const coverage = benchmarkCoverage(data, strategies);
+  if (coverage) {
+    const earliestSupported = monthStart(coverage.firstMonth);
+    const latestSupported = monthEnd(coverage.lastMonth);
+    const firstIso = first.toISOString().slice(0, 10);
+    const lastIso = last.toISOString().slice(0, 10);
+
+    if (months[0] < coverage.firstMonth) {
+      const covered = lastIso >= earliestSupported;
+      throw new AnalysisError(
+        'history-before-coverage',
+        `This history starts ${firstIso}, before the benchmark data begins. The earliest ` +
+          `supported date is ${earliestSupported}. ` +
+          (covered
+            ? `The part of it from ${earliestSupported} to ${lastIso} can be analysed.`
+            : 'None of this history falls inside the supported range.'),
+        {
+          earliestSupported,
+          latestSupported,
+          coveredFrom: covered ? earliestSupported : null,
+          coveredTo: covered ? lastIso : null,
+        },
+      );
+    }
+    if (months[months.length - 1] > coverage.lastMonth) {
+      const covered = firstIso <= latestSupported;
+      throw new AnalysisError(
+        'history-after-coverage',
+        `This history runs to ${lastIso}, past the end of the benchmark data. The latest ` +
+          `supported date is ${latestSupported}. ` +
+          (covered
+            ? `The part of it from ${firstIso} to ${latestSupported} can be analysed.`
+            : 'None of this history falls inside the supported range.'),
+        {
+          earliestSupported,
+          latestSupported,
+          coveredFrom: covered ? firstIso : null,
+          coveredTo: covered ? latestSupported : null,
+        },
+      );
+    }
+  }
 
   const grossContributed = flows.filter((f) => f.amount > 0).reduce((s, f) => s + f.amount, 0);
   const grossWithdrawn = -flows.filter((f) => f.amount < 0).reduce((s, f) => s + f.amount, 0);
   const netContributed = grossContributed - grossWithdrawn;
 
-  const yourCF = [...flows.map((f) => ({ date: f.date, amount: -f.amount })),
+  const yourCF = [...modelFlows.map((f) => ({ date: f.date, amount: -f.amount })),
                   { date: last, amount: endingValue }];
   const yourXirr = xirr(yourCF);
 
@@ -919,8 +1167,11 @@ export function analyse(
 
   const results: StrategyResult[] = strategies.map((def) => {
     const series = buildStrategySeries(def, data, months);
-    const { path, ending } = replay(series, flows, months);
-    const cf = [...flows.map((f) => ({ date: f.date, amount: -f.amount })),
+    // The reference is given the same money on the same days, opening position
+    // included — otherwise a lump-sum history would be compared against a
+    // strategy that was never funded and would end at zero.
+    const { path, ending } = replay(series, modelFlows, months);
+    const cf = [...modelFlows.map((f) => ({ date: f.date, amount: -f.amount })),
                 { date: last, amount: ending }];
     const ann: Record<string, number> = {};
     for (const [y, p] of Object.entries(periods)) {
@@ -947,8 +1198,21 @@ export function analyse(
   });
 
   const ref = results.find((r) => r.id === referenceId) ?? results[0];
-  const available = ref.endingValue - netContributed;
-  const kept = endingValue - netContributed;
+  /**
+   * Capital the user put to work over the period: contributed during it, plus
+   * anything already invested when it opened. Stripping this out is what makes
+   * the capture bar mean "gain", per SPEC.md's default view — "contributions
+   * stripped out, because you don't get credit for those".
+   *
+   * `openingPosition` is 0 for every history that has flows, so this is
+   * `netContributed` exactly as before for all of them. It is non-zero only in
+   * the lump-sum case, where leaving it out would count the entire opening
+   * balance as available gain and report a capture percentage that is not
+   * about performance at all.
+   */
+  const investedBase = netContributed + openingPosition;
+  const available = ref.endingValue - investedBase;
+  const kept = endingValue - investedBase;
   const forgone = available - kept;
 
   // fee share: what the same gross performance would have produced at 0.10%
@@ -959,7 +1223,7 @@ export function analyse(
         let lo = endingValue, hi = endingValue * 3;
         for (let i = 0; i < 200; i++) {
           const mid = (lo + hi) / 2;
-          const r = xirr([...flows.map((f) => ({ date: f.date, amount: -f.amount })),
+          const r = xirr([...modelFlows.map((f) => ({ date: f.date, amount: -f.amount })),
                           { date: last, amount: mid }]);
           if (r < target) lo = mid; else hi = mid;
         }
@@ -1020,6 +1284,16 @@ export function analyse(
   }
   const granularity = classifyGranularity(observedMonths, spanMonths);
 
+  // INTERACTION.md: "Balance dated before first contribution — ask whether
+  // that's an opening balance; offer to convert it." Both halves belong to the
+  // UI, but it cannot ask what it has not been told, and until it asks, the
+  // engine is measuring a return on capital it never saw arrive. Reported as a
+  // date rather than a boolean so the question can name the row.
+  const balanceBeforeFirstFlow =
+    flows.length > 0 && balances[0].date < flows[0].date
+      ? balances[0].date.toISOString().slice(0, 10)
+      : null;
+
   const warnings = dataQualityWarnings({
     granularity,
     observedMonths,
@@ -1028,11 +1302,16 @@ export function analyse(
     periods,
     balanceYears: [...new Set(balances.map((b) => b.date.getUTCFullYear()))],
     flowDates: flows.map((f) => f.date),
+    openingPositionDate:
+      openingPosition > 0 ? balances[0].date.toISOString().slice(0, 10) : null,
+    balanceBeforeFirstFlow,
+    firstFlowDate: flows.length ? flows[0].date.toISOString().slice(0, 10) : null,
   });
 
   return {
     netContributed, grossContributed, grossWithdrawn, endingValue,
-    gain: endingValue - netContributed,
+    gain: endingValue - investedBase,
+    openingPosition,
     you, periods, strategies: results, referenceId: ref.id, capture,
     flowFreeWindows: findFlowFreeWindows(balances, flows),
     findings,
@@ -1044,6 +1323,7 @@ export function analyse(
       coverage: observedMonths / spanMonths,
       largestGapMonths,
       flowCount: flows.length,
+      balanceBeforeFirstFlow,
       granularity,
       firstDate: first.toISOString().slice(0, 10),
       lastDate: last.toISOString().slice(0, 10),

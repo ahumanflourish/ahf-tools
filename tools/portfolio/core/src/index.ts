@@ -11,6 +11,10 @@ export {
   // main entry
   analyse,
   deriveFindings,
+  // input validation — the catchable error `analyse` refuses with, and the
+  // benchmark window that decides two of its four codes
+  AnalysisError,
+  benchmarkCoverage,
   // data quality — the classifier and the warning copy, exported so a UI can
   // recompute both after the user edits the review table
   classifyGranularity,
@@ -37,6 +41,7 @@ export {
 } from './engine';
 
 export type {
+  AnalysisErrorCode,
   InputRow,
   Holding,
   PortfolioInput,
