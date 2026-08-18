@@ -134,8 +134,9 @@ export function renderComposite(r) {
     return out.join('\n');
   }
   out.push(dim(
-    `  fitted over ${r.months} months: ${r.components[0]} ${(r.impliedWeight * 100).toFixed(1)}% / ` +
-    `${r.components[1]} ${((1 - r.impliedWeight) * 100).toFixed(1)}%  ·  ` +
+    `  ${r.months} months, weight refitted on a rolling ${r.windowMonths}-month window: ` +
+    `${r.components[0]} ${(r.weightFirst * 100).toFixed(1)}% -> ${(r.weightLast * 100).toFixed(1)}% ` +
+    `(pooled ${(r.impliedWeight * 100).toFixed(1)}%)  ·  ` +
     `residual rms ${r.rmsBp.toFixed(1)}bp, max ${r.maxBp.toFixed(1)}bp`,
   ));
   out.push(table(
