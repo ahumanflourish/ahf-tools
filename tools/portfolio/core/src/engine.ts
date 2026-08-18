@@ -4,6 +4,12 @@
  * Pure functions. No DOM, no network, no framework. Everything here is
  * deterministic and unit-testable against fixtures.json.
  *
+ * One input is not carried by the portfolio data: `currentAge` is an age as of
+ * today, so the year it implies moves on 1 January. `analyse` and
+ * `deriveFindings` therefore take an optional `now`, defaulting to the wall
+ * clock. Pass it and the call is fully reproducible; omit it and only the
+ * target-year check can drift.
+ *
  * Vocabulary note: this module never says "advisor". A portfolio has a
  * `feePct`; it may be 0. The comparison is always "your strategy" versus
  * "reference strategies", which keeps it usable by DIY investors,
@@ -118,6 +124,73 @@ export interface PeriodInfo {
  */
 const FULL_PERIOD_DAYS = 330;
 
+/**
+ * How dense the user's balance history is, as a cadence the user recognises.
+ *
+ * WHY FOUR AND NOT THREE. The previous three-bucket split put the boundary
+ * between `annual` and `monthly` at 80% of months observed, and everything
+ * from one observation a year up to 79% coverage landed in `annual`. Over a
+ * 58-month history that single bucket held anything from 5 balances to 46 —
+ * it told someone with a balance every other month that their figures were
+ * annual-grade, which is the same class of error the tool exists to expose.
+ *
+ * SPEC.md's three input tiers are about how much WORK the user does, not how
+ * dense the result is, and they only anchor two points on this scale: tier 1
+ * (year-end balances) lands on `annual`, tier 2 (monthly balances) lands on
+ * `monthly`, and tier 3 adds a holdings snapshot, which changes which findings
+ * can fire and not the balance density at all. Real histories sit between the
+ * two anchors — quarterly statements are the commonest cadence anyone actually
+ * has — and below tier 1 there is data too thin to support a yearly figure.
+ * Hence four: the two tier anchors, the gap between them, and the floor below.
+ */
+export type Granularity = 'monthly' | 'quarterly' | 'annual' | 'sparse';
+
+/**
+ * Upper bounds, in mean months per observation, for each bucket.
+ *
+ * JUDGEMENT CALL, like FULL_PERIOD_DAYS. Cadence is multiplicative — the step
+ * from monthly to quarterly is the same size as quarterly to annual — so the
+ * boundaries sit at the geometric mean of the nominal cadences they separate:
+ * sqrt(1 x 3) = 1.73 (rounded to 1.75) and sqrt(3 x 12) = 6. The floor below
+ * `annual` is 18, one and a half years, so a history that misses one year-end
+ * is still annual data with a hole rather than something else entirely.
+ *
+ * These are means over the whole span, so they describe aggregate density and
+ * nothing about where the holes are. `largestGapMonths` carries that, and the
+ * warnings say it out loud when the two disagree.
+ */
+export const GRANULARITY_MAX_INTERVAL: Record<Exclude<Granularity, 'sparse'>, number> = {
+  monthly: 1.75,
+  quarterly: 6,
+  annual: 18,
+};
+
+/**
+ * Classify a balance history by mean months per observation.
+ *
+ * Edge cases this is answerable for, all against a 58-month span unless said:
+ *   2 balances over 5 years   -> interval ~30   -> sparse
+ *   5 year-end balances       -> interval 11.6  -> annual
+ *   8 year-end balances (85mo)-> interval 10.6  -> annual
+ *   27 bi-monthly balances    -> interval 2.15  -> quarterly
+ *   46 of 58 months           -> interval 1.26  -> monthly
+ *   58 monthly balances       -> interval 1.00  -> monthly
+ *
+ * The label is deliberately conservative at the boundaries: the fixture's
+ * 2.15-month cadence is denser than quarterly, and calling it `quarterly`
+ * understates it. Understating precision is the safe direction; overstating
+ * it is the defect.
+ */
+export function classifyGranularity(observedMonths: number, spanMonths: number): Granularity {
+  if (observedMonths <= 0 || spanMonths <= 0) return 'sparse';
+  const interval = spanMonths / observedMonths;
+  if (interval <= GRANULARITY_MAX_INTERVAL.monthly) return 'monthly';
+  if (interval <= GRANULARITY_MAX_INTERVAL.quarterly) return 'quarterly';
+  if (interval <= GRANULARITY_MAX_INTERVAL.annual) return 'annual';
+  return 'sparse';
+}
+
+
 export interface Finding {
   id: string;
   severity: 'info' | 'caution' | 'notable';
@@ -161,14 +234,43 @@ export interface AnalysisResult {
    * correlation, not a sourced market-cap number.
    */
   marketWeight: MarketWeight;
-  dataQuality: {
-    balanceCount: number;
-    flowCount: number;
-    granularity: 'annual' | 'monthly' | 'sparse';
-    firstDate: string;
-    lastDate: string;
-    warnings: string[];
-  };
+  dataQuality: DataQuality;
+}
+
+/**
+ * How much interpolation stands between the user's data and the answer.
+ *
+ * `granularity` is a label; everything around it is the evidence for that
+ * label. Both are surfaced because SPEC.md non-negotiable 5 is that the tool
+ * must not invent precision — a UI that shows only the word can say "annual"
+ * and stop, where one that can also say "27 of 58 months" cannot mislead.
+ */
+export interface DataQuality {
+  /** Balance ROWS supplied. Not the same as `observedMonths` — see below. */
+  balanceCount: number;
+  /**
+   * Distinct calendar months carrying at least one balance row. This, not
+   * `balanceCount`, is the number of markers V1 draws and the number the
+   * classification is computed from: two balances inside one month tell you
+   * about one month, not two.
+   */
+  observedMonths: number;
+  /** Months from `firstDate` to `lastDate` inclusive — the analysis span. */
+  spanMonths: number;
+  /** `observedMonths / spanMonths`. 1 means a balance in every month. */
+  coverage: number;
+  /**
+   * Largest run, in months, between two consecutive observed months.
+   * 1 means no gaps anywhere; 0 when there is only one observation.
+   * A large figure here alongside good `coverage` means the data is dense in
+   * places and absent in others, which the average on its own would hide.
+   */
+  largestGapMonths: number;
+  flowCount: number;
+  granularity: Granularity;
+  firstDate: string;
+  lastDate: string;
+  warnings: string[];
 }
 
 // ─────────────────────────────────────────────────────── date helpers
@@ -353,6 +455,171 @@ export function findFlowFreeWindows(
     .filter((w, i, arr) => !arr.slice(0, i).some((p) => w.start < p.end && w.end > p.start));
 }
 
+// ─────────────────────────────────────────────────── data-quality warnings
+
+/** "2021", "2021 and 2026", "2021, 2023 and 2026". */
+function joinList(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? '';
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+/** Plain-language cadence for a mean interval in months. */
+function cadencePhrase(intervalMonths: number): string {
+  const n = Math.round(intervalMonths);
+  if (intervalMonths > 18) return 'fewer than one a year';
+  if (n >= 11 && n <= 13) return 'about one a year';
+  if (n <= 1) return 'roughly one a month';
+  return `about one every ${n} months`;
+}
+
+/**
+ * The user-facing `dataQuality.warnings` list.
+ *
+ * Every string here states a fact about THIS input, what it makes approximate,
+ * and what would sharpen it — in that order, which is the pattern the existing
+ * copy already used. Nothing fires speculatively: each condition is checked
+ * against the data rather than assumed from the tier the user appears to be in.
+ *
+ * Kept as a separate exported function so the wording can be tested directly
+ * and so a UI can regenerate it after the user edits the review table.
+ */
+export function dataQualityWarnings(args: {
+  granularity: Granularity;
+  observedMonths: number;
+  spanMonths: number;
+  largestGapMonths: number;
+  /** Same object `analyse` returns, keyed by year in ascending order. */
+  periods: Record<string, PeriodInfo>;
+  /** Every calendar year carrying at least one balance row. */
+  balanceYears: number[];
+  flowDates: Date[];
+}): string[] {
+  const { granularity, observedMonths, spanMonths, largestGapMonths, periods } = args;
+  const out: string[] = [];
+  const interval = observedMonths > 0 ? spanMonths / observedMonths : Infinity;
+
+  // 1. Density. How much of the line between the dots is drawn rather than
+  //    observed, and what that costs. Silent at `monthly`, where there is
+  //    nothing to warn about.
+  // Worth saying separately when the holes are much bigger than the average
+  // implies. A mean of "one every 2 months" and an 8-month blind spot are both
+  // true at once, and only the first of them is reassuring.
+  const lumpy = largestGapMonths >= 3 && largestGapMonths >= 2 * interval;
+
+  if (granularity !== 'monthly') {
+    const cover =
+      `Balances cover ${observedMonths} of the ${spanMonths} months in this period — ` +
+      `${cadencePhrase(interval)}` +
+      (lumpy ? `, and the longest stretch without one runs ${largestGapMonths} months` : '') +
+      '.';
+
+    if (granularity === 'sparse') {
+      out.push(
+        `${cover} That is not enough to say much about any single year. Your return over ` +
+        `the whole period is the figure to lean on — it needs only the dates and amounts, ` +
+        `so it is unaffected. Year-end balances would sharpen everything else considerably.`);
+    } else if (granularity === 'annual') {
+      out.push(
+        `${cover} Your year-by-year figures are the right shape but rough: within each year ` +
+        `the return is estimated from your contribution dates rather than measured. ` +
+        `Quarter-end or month-end balances would sharpen them.`);
+    } else {
+      out.push(
+        `${cover} Between observations your value is drawn as a straight line rather than ` +
+        `observed, and each period's return is estimated from your contribution dates ` +
+        `rather than measured directly. Month-end balances would sharpen both.`);
+    }
+  } else if (lumpy) {
+    // `monthly` suppresses the density warning, which would otherwise carry
+    // the gap clause — so a history that is dense everywhere except for one
+    // long hole would say nothing at all about the hole. It has to.
+    out.push(
+      `Balances cover ${observedMonths} of the ${spanMonths} months in this period, but the ` +
+      `longest stretch without one runs ${largestGapMonths} months. Across that stretch your ` +
+      `value is drawn as a straight line rather than observed, and any figure covering it is ` +
+      `approximate rather than measured. A balance inside it would sharpen those periods.`);
+  }
+
+  // 2. Partial periods. `you.annual` reports these next to full years by
+  //    design — V3 renders all of them — so the user has to be told which
+  //    ones are not a year.
+  const years = Object.keys(periods);
+  const partial = years.filter((y) => periods[y].partial);
+  const notAYear = (days: number): string =>
+    `Its return is the plain return over those ${days} days, not annualised, so it should ` +
+    `not be read alongside the full years as if it were one.`;
+
+  if (partial.length > 2) {
+    // Individually this would flood the list, so state the shape once.
+    const detail = partial.map((y) => `${y} (${periods[y].days} days)`).join(', ');
+    out.push(
+      `${partial.length} of the ${years.length} periods cover less than a full year: ${detail}. ` +
+      `Each is the plain return over its own window, not annualised, so they are not ` +
+      `comparable with the full years or with one another. Year-end balances would make ` +
+      `them comparable.`);
+  } else {
+    for (const y of partial) {
+      const p = periods[y];
+      const head = `${y} covers ${p.days} days (${p.start} to ${p.end}), not a full year. `;
+      if (y === years[0]) {
+        // The window opens at the first balance, so the remedy is an earlier
+        // one — IF there was anything to observe. Stated conditionally
+        // because for most people there was not: the account began here.
+        out.push(
+          `${head}${notAYear(p.days)} If the account existed before ${p.start}, adding an ` +
+          `earlier balance would make it a full year.`);
+      } else if (y === years[years.length - 1]) {
+        // Short because the year is still running — but it can also be short
+        // at its OPENING end, when no balance sits at the previous year end,
+        // and then waiting will not fix the whole of it.
+        const opensAtPriorYearEnd = p.start.slice(0, 7) === `${Number(y) - 1}-12`;
+        out.push(
+          opensAtPriorYearEnd
+            ? `${head}${notAYear(p.days)} It fills in as the year completes.`
+            : `${head}${notAYear(p.days)} A balance dated ${Number(y) - 1}-12-31 would line it ` +
+              `up with the calendar year, and the rest fills in as the year completes.`);
+      } else {
+        const yr = Number(y);
+        const opensAtPriorYearEnd = p.start.slice(0, 7) === `${yr - 1}-12`;
+        const missing = opensAtPriorYearEnd ? `${yr}-12-31` : `${yr - 1}-12-31`;
+        out.push(
+          `${head}${notAYear(p.days)} A balance dated ${missing} would make it a full year.`);
+      }
+    }
+  }
+
+  // 3. Years that produced no figure at all. A year needs an opening balance
+  //    before a closing one; a year holding a single balance, with none in the
+  //    year before it, has nothing to measure from and is silently absent from
+  //    `you.annual`. Silently is the problem.
+  const unmeasured = args.balanceYears.filter((y) => !(String(y) in periods)).map(String);
+  if (years.length === 0) {
+    out.push(
+      `No year-by-year return could be measured: no calendar year has both an opening and ` +
+      `a closing balance. Your return over the whole period is unaffected — it needs only ` +
+      `the flow dates and the final value. A balance at each year end would fill in the ` +
+      `year-by-year comparison.`);
+  } else if (unmeasured.length > 0) {
+    out.push(
+      `No year-by-year return could be measured for ${joinList(unmeasured)}: ` +
+      `${unmeasured.length === 1 ? 'that year has' : 'those years have'} a single balance ` +
+      `and none in the year before, so there is nothing to measure from. Your return over ` +
+      `the whole period is unaffected. A balance at each year end would fill ` +
+      `${unmeasured.length === 1 ? 'it' : 'them'} in.`);
+  }
+
+  // 4. Dates that look reconstructed rather than recorded. Unchanged rule and
+  //    unchanged wording; it hedges ("usually") because a genuine monthly
+  //    contributor on the 15th looks identical to an estimate.
+  if (args.flowDates.length > 0 && !args.flowDates.some((d) => d.getUTCDate() !== 15)) {
+    out.push(
+      'All contributions appear to be dated mid-month, which usually means dates were estimated. ' +
+      'Real transaction dates will improve accuracy.');
+  }
+
+  return out;
+}
+
 // ──────────────────────────────────────────────────────────── findings
 
 /**
@@ -454,12 +721,21 @@ export function deriveFindings(
    * before partial periods were tracked.
    */
   periods: Record<string, PeriodInfo> = {},
+  /**
+   * The date `currentAge` is stated as of. Only the target-year check uses it,
+   * and only its UTC year. Defaulting to the wall clock keeps every existing
+   * caller working; passing it explicitly is what makes this module as
+   * deterministic as its docblock claims, because `currentAge` is an age
+   * TODAY and the year it implies changes on 1 January whether or not the
+   * input did.
+   */
+  now: Date = new Date(),
 ): Finding[] {
   const f: Finding[] = [];
 
   // 1. Target-date horizon mismatch
   if (input.currentAge && input.statedTargetYear) {
-    const retireAge = input.statedTargetYear - (new Date().getUTCFullYear() - input.currentAge);
+    const retireAge = input.statedTargetYear - (now.getUTCFullYear() - input.currentAge);
     if (retireAge < 60) {
       f.push({
         id: 'target-year-mismatch',
@@ -580,6 +856,12 @@ export function analyse(
   data: BenchmarkData,
   strategies: StrategyDef[],
   referenceId: string,
+  /**
+   * The date `input.currentAge` is stated as of. Threaded to `deriveFindings`
+   * and used nowhere else. Defaults to the wall clock so callers need not care;
+   * supply it to make the whole call reproducible.
+   */
+  now: Date = new Date(),
 ): AnalysisResult {
   const flows = input.rows
     .filter((r): r is Extract<InputRow, { type: 'contribution' | 'withdrawal' }> =>
@@ -718,24 +1000,35 @@ export function analyse(
           source: 'fallback',
         };
 
-  const findings = deriveFindings(input, you, ref, capture, marketWeight, periods);
+  const findings = deriveFindings(input, you, ref, capture, marketWeight, periods, now);
 
+  // Data quality is measured in MONTHS OBSERVED, not balance rows: two
+  // balances inside one month are one month of evidence, and the span they sit
+  // in is what the chart draws. `balanceCount` still reports rows, because
+  // that is what the user typed and the two are worth being able to compare.
   const spanMonths = months.length;
-  const granularity: 'annual' | 'monthly' | 'sparse' =
-    balances.length >= spanMonths * 0.8 ? 'monthly'
-    : balances.length >= spanMonths / 12 ? 'annual' : 'sparse';
+  const observedMonthKeys = [...new Set(balances.map((b) => ym(b.date)))].sort();
+  const observedMonths = observedMonthKeys.length;
+  const monthIndex = (mk: string): number => {
+    const [y, m] = mk.split('-').map(Number);
+    return y * 12 + (m - 1);
+  };
+  let largestGapMonths = 0;
+  for (let i = 1; i < observedMonthKeys.length; i++) {
+    const gap = monthIndex(observedMonthKeys[i]) - monthIndex(observedMonthKeys[i - 1]);
+    if (gap > largestGapMonths) largestGapMonths = gap;
+  }
+  const granularity = classifyGranularity(observedMonths, spanMonths);
 
-  const warnings: string[] = [];
-  if (granularity === 'sparse') {
-    warnings.push(
-      'You have fewer balance points than years covered. Annual returns will be rough. ' +
-      'Adding year-end balances will sharpen this considerably.');
-  }
-  if (!flows.some((f) => f.date.getUTCDate() !== 15)) {
-    warnings.push(
-      'All contributions appear to be dated mid-month, which usually means dates were estimated. ' +
-      'Real transaction dates will improve accuracy.');
-  }
+  const warnings = dataQualityWarnings({
+    granularity,
+    observedMonths,
+    spanMonths,
+    largestGapMonths,
+    periods,
+    balanceYears: [...new Set(balances.map((b) => b.date.getUTCFullYear()))],
+    flowDates: flows.map((f) => f.date),
+  });
 
   return {
     netContributed, grossContributed, grossWithdrawn, endingValue,
@@ -745,7 +1038,13 @@ export function analyse(
     findings,
     marketWeight,
     dataQuality: {
-      balanceCount: balances.length, flowCount: flows.length, granularity,
+      balanceCount: balances.length,
+      observedMonths,
+      spanMonths,
+      coverage: observedMonths / spanMonths,
+      largestGapMonths,
+      flowCount: flows.length,
+      granularity,
       firstDate: first.toISOString().slice(0, 10),
       lastDate: last.toISOString().slice(0, 10),
       warnings,

@@ -11,6 +11,11 @@ export {
   // main entry
   analyse,
   deriveFindings,
+  // data quality — the classifier and the warning copy, exported so a UI can
+  // recompute both after the user edits the review table
+  classifyGranularity,
+  dataQualityWarnings,
+  GRANULARITY_MAX_INTERVAL,
   // market weight (derived, not sourced — see engine.ts)
   impliedUsMarketWeight,
   FALLBACK_US_MARKET_WEIGHT,
@@ -39,6 +44,8 @@ export type {
   StrategyDef,
   StrategyResult,
   PeriodInfo,
+  Granularity,
+  DataQuality,
   Finding,
   MarketWeight,
   AnalysisResult,
