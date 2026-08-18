@@ -1,0 +1,15 @@
+{
+  "name": "@ahumanflourish/portfolio-data-tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline verification harness for benchmark return data. Zero dependencies, zero network.",
+  "bin": {
+    "verify-benchmarks": "./verify.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/",
+    "check": "node verify.mjs check ../core/src/data/benchmarks.json",
+    "noise-floor": "node verify.mjs noise-floor ../core/src/data/benchmarks.json"
+  }
+}
