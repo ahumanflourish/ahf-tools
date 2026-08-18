@@ -1,0 +1,9 @@
+{
+  "name": "portfolio-review",
+  "displayName": "Portfolio vs. Strategy",
+  "version": "0.1.0",
+  "description": "Compare your portfolio's history against passive reference strategies, locally.",
+  "author": { "name": "A Human Flourish" },
+  "repository": "https://github.com/ahumanflourish/ahf-tools",
+  "license": "MIT"
+}

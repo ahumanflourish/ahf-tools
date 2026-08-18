@@ -1,0 +1,24 @@
+{
+  "name": "ahf-tools",
+  "description": "Tools from A Human Flourish. Each installs on its own; nothing is cloned wholesale.",
+  "owner": {
+    "name": "A Human Flourish",
+    "email": "ahumanflourish@gmail.com",
+    "url": "https://github.com/ahumanflourish/ahf-tools"
+  },
+  "plugins": [
+    {
+      "name": "portfolio-review",
+      "source": "./tools/portfolio",
+      "displayName": "Portfolio vs. Strategy",
+      "description": "Compare your portfolio's history against passive reference strategies over the same period with the same cash flows. Runs entirely on your machine; your figures are never sent anywhere.",
+      "version": "0.1.0",
+      "author": { "name": "A Human Flourish" },
+      "category": "productivity",
+      "keywords": ["portfolio", "investing", "benchmark", "privacy"],
+      "homepage": "https://ahumanflourish.com",
+      "repository": "https://github.com/ahumanflourish/ahf-tools",
+      "license": "MIT"
+    }
+  ]
+}

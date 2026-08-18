@@ -1,0 +1,15 @@
+{
+  "name": "@ahumanflourish/portfolio-build",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Build pipeline for @ahumanflourish/portfolio-core. Emits three targets from one shared core: an ESM library, a single-file offline HTML page, and a self-contained artifact payload.",
+  "scripts": {
+    "build": "node ./build.mjs",
+    "acceptance": "python3 ./test/acceptance.py"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3"
+  }
+}
