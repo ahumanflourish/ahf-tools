@@ -107,6 +107,14 @@ export interface AnalysisResult {
   };
   flowFreeWindows: { start: string; end: string; months: number; yourReturn: number }[];
   findings: Finding[];
+  /**
+   * The US market weight the `regional-tilt` check was measured against, with
+   * its provenance. Surfaced so the UI can show the figure next to the finding
+   * (VISUALS.md V5 requires the market-weight comparison alongside the holdings)
+   * and label it honestly — a `derived` figure is inferred from return
+   * correlation, not a sourced market-cap number.
+   */
+  marketWeight: MarketWeight;
   dataQuality: {
     balanceCount: number;
     flowCount: number;
@@ -309,7 +317,11 @@ export function findFlowFreeWindows(
 export interface MarketWeight {
   /** US share of global equity market capitalisation, as a fraction. */
   usEquity: number;
-  /** `YYYY-MM` the estimate is anchored to, or null for the fallback. */
+  /**
+   * `YYYY-MM` the estimate is anchored to. Null when the figure carries no
+   * date of its own: the fallback constant, and a user-supplied override
+   * (we know the number they gave us, not the date they meant it for).
+   */
   asOf: string | null;
   source: 'derived' | 'user' | 'fallback';
   /** Months of data behind a derived estimate. */
@@ -601,7 +613,31 @@ export function analyse(
   };
 
   const you = { xirr: yourXirr, annual: yourAnnual };
-  const findings = deriveFindings(input, you, ref, capture);
+
+  // Market weight for the regional-tilt check, in order of precedence:
+  //   1. an explicit `usMarketWeight` from the user — a judgement input, so
+  //      theirs wins, and it carries no date because we don't know what date
+  //      they meant it for;
+  //   2. a value derived from the benchmark series, anchored to the holdings
+  //      date when there are holdings, because that is the date the comparison
+  //      is actually about — comparing a 2023 snapshot against a 2026 weight
+  //      would measure the market's drift as if it were the user's tilt;
+  //   3. the fallback constant, when there is too little data to derive one.
+  // `slice(0, 7)` rather than a Date round-trip: holdings dates are written
+  // both as `YYYY-MM-DD` and as `YYYY-MM`, and this reads both. A mid-month
+  // snapshot pulls in that whole month's return, which is immaterial to a
+  // weight estimate.
+  const holdingsMonth = input.holdings?.asOf.slice(0, 7);
+  const marketWeight: MarketWeight =
+    input.usMarketWeight != null
+      ? { usEquity: input.usMarketWeight, asOf: null, source: 'user' }
+      : impliedUsMarketWeight(data, holdingsMonth) ?? {
+          usEquity: FALLBACK_US_MARKET_WEIGHT,
+          asOf: null,
+          source: 'fallback',
+        };
+
+  const findings = deriveFindings(input, you, ref, capture, marketWeight);
 
   const spanMonths = months.length;
   const granularity: 'annual' | 'monthly' | 'sparse' =
@@ -626,6 +662,7 @@ export function analyse(
     you, strategies: results, referenceId: ref.id, capture,
     flowFreeWindows: findFlowFreeWindows(balances, flows),
     findings,
+    marketWeight,
     dataQuality: {
       balanceCount: balances.length, flowCount: flows.length, granularity,
       firstDate: first.toISOString().slice(0, 10),
