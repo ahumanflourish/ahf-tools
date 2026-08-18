@@ -11,6 +11,10 @@ export {
   // main entry
   analyse,
   deriveFindings,
+  // market weight (derived, not sourced — see engine.ts)
+  impliedUsMarketWeight,
+  FALLBACK_US_MARKET_WEIGHT,
+  REGIONAL_TILT_THRESHOLD,
   // strategy construction and replay
   buildStrategySeries,
   replay,
@@ -36,5 +40,6 @@ export type {
   StrategyResult,
   PeriodInfo,
   Finding,
+  MarketWeight,
   AnalysisResult,
 } from './engine';

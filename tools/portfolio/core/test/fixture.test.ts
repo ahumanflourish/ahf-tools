@@ -311,11 +311,11 @@ describe('reference-case-2021-2026 fixture', () => {
   it('fires exactly the expected findings', () => {
     const ids = result.findings.map((f) => f.id).sort();
 
-    // Diagnostic for the known divergence: `regional-tilt` requires the US
-    // share of equity to deviate by MORE than 15pp from a 63% market weight
-    // (engine.ts deriveFindings check 4, matching SPEC.md). The fixture's
-    // holdings give 76.83% US, a deviation of 13.83pp, so the check does not
-    // fire. Nothing here is loosened to hide that.
+    // Diagnostic for `regional-tilt`: it requires the US share of equity to
+    // deviate by MORE than 15pp from market weight (engine.ts deriveFindings
+    // check 4). Market weight is derived from the benchmark series and anchored
+    // to the holdings date, not hardcoded, so this reports against whatever
+    // `result.marketWeight` resolved to. Nothing here is loosened.
     const eq = input.holdings!.positions.filter(
       (p) => p.assetClass === 'us_equity' || p.assetClass === 'intl_equity',
     );
@@ -329,7 +329,9 @@ describe('reference-case-2021-2026 fixture', () => {
       ids,
       `findings mismatch. Holdings diagnostic: equity total ${eqTotal.toFixed(2)}, ` +
         `US ${usTotal.toFixed(2)}, usShare ${(usShare * 100).toFixed(2)}%, ` +
-        `deviation from 63% market weight ${((usShare - 0.63) * 100).toFixed(2)}pp, ` +
+        `deviation from ${(result.marketWeight.usEquity * 100).toFixed(2)}% market ` +
+        `weight (${result.marketWeight.source}, asOf ${result.marketWeight.asOf}) ` +
+        `${((usShare - result.marketWeight.usEquity) * 100).toFixed(2)}pp, ` +
         `engine threshold >15pp.`,
     ).toEqual([...expected.findings].sort());
   });

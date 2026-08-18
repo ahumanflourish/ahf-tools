@@ -1,0 +1,756 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portfolio value over time — A Human Flourish</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,100..900,0..100,0..1&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Palette */
+  --cream: #f5f0e8;  --warm-black: #1a1715;  --terracotta: #c17c5a;
+  --sage: #7a8b6f;   --dusty-blue: #6b8a9e;  --gold: #c4a86b;
+  --stone: #948a7c;  --deep-green: #4a5e3f;  --moss: #8a9e6b;
+  --bark: #6b5a4a;
+
+  /* Roles */
+  --surface: var(--cream);
+  --surface-raised: #fbf8f3;
+  --ink: var(--warm-black);
+  --accent: var(--terracotta);
+  --line: var(--stone);
+  --line-soft: #ddd4c6;
+  --subtle: var(--stone);
+  --muted: var(--bark);
+  --marker: var(--sage);
+
+  /* State */
+  --positive: var(--sage);          --positive-soft: #e8ede4;
+  --attention: var(--terracotta);   --attention-soft: #f6e7de;
+  --inactive: var(--stone);
+
+  /* Motion */
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --slow: 1200ms;
+  --fast: 300ms;
+
+  /* Tracking */
+  --tracking-label: 0.18em;
+  --tracking-control: 0.12em;
+  --tracking-micro: 0.15em;
+
+  /* Borders */
+  --border-thin: 1px; --border-normal: 1.5px; --border-thick: 2px;
+  --inset-double: 3px;
+  --radius: 0;
+
+  /* Type */
+  --text-micro: 8px;
+  --text-label: 10px;
+  --text-meta: 11px;
+  --text-control: 12px;
+  --text-body: 16px;
+  --leading-display: 1.15;
+  --text-h1: clamp(34px, 5vw, 52px);
+  --text-h2: 26px;
+  --text-h3: 20px;
+
+  /* Chart — series identity. Two categorical slots, validated against the
+     cream surface. Neither carries a shipped state meaning. */
+  --series-you: var(--dusty-blue);
+  --series-ref: var(--deep-green);
+  --grid: var(--line-soft);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  font-size: var(--text-body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.display {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'WONK' 1, 'SOFT' 100, 'opsz' 72;
+  font-weight: 300;
+  line-height: var(--leading-display);
+  margin: 0;
+}
+
+.label {
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  font-size: var(--text-control); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-label);
+  color: var(--marker);
+  margin: 0;
+}
+
+.page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 48px 40px 88px;
+}
+
+.masthead { margin-bottom: 56px; }
+
+.head { margin-bottom: 32px; }
+.head .label { margin-bottom: 14px; }
+h1.display { font-size: var(--text-h1); max-width: 25ch; }
+.lede {
+  margin: 16px 0 0;
+  max-width: 62ch;
+  color: var(--muted);
+  font-size: 17px;
+}
+.lede strong { font-weight: 600; color: var(--ink); }
+.explainer {
+  margin: 10px 0 0;
+  max-width: 62ch;
+  color: var(--subtle);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* Card — solid outer border, dashed inner 3px in */
+.card {
+  position: relative;
+  border: var(--border-thick) solid var(--line);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 26px 28px 24px;
+  transition: border-color var(--slow) var(--ease);
+}
+.card::before {
+  content: ""; position: absolute; inset: var(--inset-double);
+  pointer-events: none;
+  border: var(--border-thick) dashed color-mix(in oklab, var(--line) 30%, transparent);
+  transition: border-color var(--slow) var(--ease);
+}
+
+.chart-head {
+  display: flex; flex-wrap: wrap; align-items: flex-start;
+  justify-content: space-between; gap: 16px 24px;
+  margin-bottom: 18px;
+}
+
+/* Legend — always present for two series */
+.legend { display: flex; flex-wrap: wrap; gap: 8px 26px; }
+.legend-item {
+  display: inline-flex; align-items: center; gap: 9px;
+  font-size: var(--text-meta); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-micro);
+  color: var(--muted);
+}
+.legend-key { display: block; width: 26px; height: 10px; flex: none; }
+
+/* Toggle — dotted when idle, solid when chosen; fast, because the user drove it */
+.choice {
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  font-size: var(--text-control); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-control);
+  padding: 6px 12px; cursor: pointer; background: transparent;
+  color: color-mix(in oklab, var(--ink) 55%, transparent);
+  border: var(--border-thin) dotted var(--line); border-radius: var(--radius);
+  transition: border-color var(--fast) ease-out, color var(--fast) ease-out,
+              background-color var(--fast) ease-out;
+}
+.choice[aria-pressed="true"] {
+  border-style: solid; border-color: var(--ink);
+  color: var(--ink); background: color-mix(in oklab, var(--accent) 12%, transparent);
+}
+
+.plot-wrap { position: relative; }
+svg.chart { display: block; width: 100%; overflow: visible; }
+svg.chart:focus-visible { outline: var(--border-thick) dotted var(--accent); outline-offset: 4px; }
+
+.axis-tick {
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  font-size: 11px; font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  fill: var(--subtle);
+}
+.end-value {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'WONK' 1, 'SOFT' 100, 'opsz' 24;
+  font-weight: 400;
+  font-size: 17px;
+}
+.end-name {
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  font-size: 9px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-micro);
+}
+
+/* Tooltip */
+.tip {
+  position: absolute; top: 0; left: 0;
+  min-width: 178px; max-width: 264px; pointer-events: none;
+  background: var(--surface-raised);
+  border: var(--border-thin) solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px 11px;
+  opacity: 0; transition: opacity var(--fast) ease-out;
+  z-index: 3;
+}
+.tip[data-show="1"] { opacity: 1; }
+.tip-month {
+  font-size: var(--text-label); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-micro);
+  color: var(--subtle); margin-bottom: 7px;
+}
+.tip-row { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; }
+.tip-row + .tip-note { margin: 1px 0 0 24px; line-height: 1.35; }
+.tip-key { display: block; width: 16px; height: 2px; flex: none; transform: translateY(-4px); }
+.tip-val {
+  font-size: 15px; font-weight: 600; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.tip-val.is-empty { color: var(--subtle); font-weight: 500; }
+.tip-name { font-size: var(--text-meta); color: var(--muted); line-height: 1.35; white-space: nowrap; }
+.tip-note { font-size: var(--text-meta); color: var(--subtle); }
+.tip-diff {
+  margin-top: 8px; padding-top: 7px;
+  border-top: var(--border-thin) dotted var(--line);
+  font-size: var(--text-meta); color: var(--muted);
+  display: flex; justify-content: space-between; gap: 12px;
+}
+.tip-diff span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
+
+.chart-foot {
+  display: flex; flex-wrap: wrap; gap: 6px 18px;
+  margin-top: 18px; padding-top: 14px;
+  border-top: var(--border-thin) dotted var(--line);
+  font-size: var(--text-meta); color: var(--subtle);
+}
+.chart-foot span { font-variant-numeric: tabular-nums; }
+
+.warn {
+  margin-bottom: 18px; padding: 10px 14px;
+  border: var(--border-thin) dashed var(--attention);
+  background: var(--attention-soft);
+  font-size: 14px; color: var(--muted);
+}
+
+/* Table view */
+.table-wrap { margin-top: 24px; max-height: 380px; overflow: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+caption {
+  text-align: left; padding-bottom: 10px;
+  font-size: var(--text-label); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-micro);
+  color: var(--subtle);
+}
+th, td {
+  text-align: right; padding: 6px 10px;
+  border-bottom: var(--border-thin) dotted var(--line-soft);
+  font-variant-numeric: tabular-nums;
+}
+th:first-child, td:first-child { text-align: left; }
+thead th {
+  position: sticky; top: 0; background: var(--surface);
+  font-size: var(--text-label); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-micro);
+  color: var(--subtle);
+  border-bottom: var(--border-thin) solid var(--line);
+}
+[hidden] { display: none !important; }
+
+.notes { margin-top: 44px; max-width: 74ch; }
+.notes .label { margin-bottom: 12px; }
+ul.brand { list-style: none; padding-left: 0; margin: 0; }
+ul.brand li {
+  position: relative; padding-left: 22px; margin-bottom: 10px;
+  font-size: 14px; line-height: 1.55; color: var(--muted);
+}
+ul.brand li::before { content: "→"; position: absolute; left: 0; color: var(--subtle); }
+
+a { color: inherit; text-decoration: underline; text-decoration-style: dotted;
+    text-underline-offset: 3px; transition: color var(--fast) ease-out; }
+a:hover { color: var(--accent); text-decoration-style: solid; }
+:where(a, button, [tabindex]):focus-visible {
+  outline: var(--border-thick) dotted var(--accent); outline-offset: 2px;
+}
+::selection { background: var(--accent); color: var(--surface); }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .page { padding: 32px 20px 64px; }
+  .card { padding: 20px 16px 18px; }
+  .masthead { margin-bottom: 36px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
+</style>
+</head>
+<body>
+<main class="page">
+
+  <div class="masthead">
+    <a href="https://ahumanflourish.com" style="display:inline-block;line-height:0">
+      <img src="data:image/webp;base64,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" alt="A Human Flourish" width="180" style="display:block;height:auto">
+    </a>
+  </div>
+
+  <div class="head">
+    <p class="label">Portfolio vs. strategy</p>
+    <h1 class="display">Portfolio value over time</h1>
+    <p class="lede">How your money actually tracked against just buying the boring thing — your balance against <strong id="ref-label">the reference strategy</strong>, same money in, same money out, same months.</p>
+    <p class="explainer" id="ref-explainer"></p>
+  </div>
+
+  <div id="dq-warning" hidden></div>
+
+  <section class="card" aria-labelledby="chart-title">
+    <h2 id="chart-title" class="visually-hidden">Portfolio value over time</h2>
+
+    <div class="chart-head">
+      <div class="legend" id="legend"></div>
+      <button type="button" class="choice" id="table-toggle" aria-pressed="false" aria-controls="table-view">Table view</button>
+    </div>
+
+    <div class="plot-wrap" id="plot">
+      <div class="tip" id="tip" role="status" aria-live="polite"></div>
+    </div>
+
+    <p class="visually-hidden" id="chart-desc"></p>
+
+    <div class="chart-foot" id="chart-foot"></div>
+
+    <div class="table-wrap" id="table-view" hidden>
+      <table>
+        <caption id="table-caption"></caption>
+        <thead><tr>
+          <th scope="col">Month</th>
+          <th scope="col">Your value</th>
+          <th scope="col" id="th-ref">Reference</th>
+          <th scope="col">Difference</th>
+        </tr></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="notes">
+    <p class="label">Read this alongside it</p>
+    <ul class="brand">
+      <li>This is not investment advice. It makes no recommendation and says nothing about what you should do next.</li>
+      <li>The result is historical and benchmark-dependent. A different reference strategy, or a different period, gives a different answer.</li>
+      <li>A short period is a small sample. Five years containing one bear market is thin evidence about anything.</li>
+      <li>Returns aren't the whole job. A fee may also buy tax work, planning, or the coaching that stopped you selling at the bottom. This measures none of that.</li>
+    </ul>
+  </div>
+
+</main>
+
+<script>
+const D = {"referenceId":"GLOBAL_EQUITY","referenceLabel":"Global stock market","referenceExplainer":"Every listed company in the world, weighted by size. The simplest possible 'do nothing' portfolio and the fairest yardstick for a stock-heavy strategy.","referenceCaution":null,"endingValue":53690.25,"referenceEndingValue":60328.4,"yourXirr":0.10054387101873885,"referenceXirr":0.13955446880793432,"netContributed":39500,"dataQuality":{"balanceCount":27,"flowCount":13,"granularity":"annual","firstDate":"2021-10-12","lastDate":"2026-07-31","warnings":[]},"months":["2021-10-31","2021-11-30","2021-12-31","2022-01-31","2022-02-28","2022-03-31","2022-04-30","2022-05-31","2022-06-30","2022-07-31","2022-08-31","2022-09-30","2022-10-31","2022-11-30","2022-12-31","2023-01-31","2023-02-28","2023-03-31","2023-04-30","2023-05-31","2023-06-30","2023-07-31","2023-08-31","2023-09-30","2023-10-31","2023-11-30","2023-12-31","2024-01-31","2024-02-29","2024-03-31","2024-04-30","2024-05-31","2024-06-30","2024-07-31","2024-08-31","2024-09-30","2024-10-31","2024-11-30","2024-12-31","2025-01-31","2025-02-28","2025-03-31","2025-04-30","2025-05-31","2025-06-30","2025-07-31","2025-08-31","2025-09-30","2025-10-31","2025-11-30","2025-12-31","2026-01-31","2026-02-28","2026-03-31","2026-04-30","2026-05-31","2026-06-30","2026-07-31"],"reference":[10254.27,15906.48,16512.52,15756.25,15319.8,15609.34,14344.99,14415.28,13244.76,14169.24,13595.39,12299.75,13084.47,14167.86,13538.81,17687.17,17124.71,17612.77,17862.87,17646.73,18672,19366.6,18816.59,18015,17488.97,19064.72,20048.46,20048.46,20948.64,21616.9,27225.6,28477.98,28930.78,29503.61,30191.04,30855.25,30182.6,32325.09,33098.82,36776.5,38372.13,43897.12,44142.95,46707.65,48888.9,49426.68,50889.71,52604.69,53667.31,53780.01,54274.78,55962.73,56880.52,53342.55,58308.74,60979.28,60747.56,60328.4],"observations":[{"date":"2021-10-31","value":10014.74},{"date":"2021-11-30","value":15879.92},{"date":"2021-12-31","value":16500.81},{"date":"2022-01-31","value":15596.22},{"date":"2022-09-30","value":12359.97},{"date":"2022-11-30","value":14081.32},{"date":"2022-12-31","value":13412.47},{"date":"2023-01-31","value":17664.31},{"date":"2023-09-30","value":17625.17},{"date":"2023-11-30","value":18475.94},{"date":"2023-12-31","value":19602.4},{"date":"2024-03-31","value":21061.89},{"date":"2024-04-30","value":26566.43},{"date":"2024-05-31","value":27628.75},{"date":"2024-09-30","value":29788.35},{"date":"2024-11-30","value":31754.24},{"date":"2024-12-31","value":32235.32},{"date":"2025-01-31","value":35835.11},{"date":"2025-02-28","value":37103.49},{"date":"2025-03-31","value":42405.47},{"date":"2025-09-30","value":49438.47},{"date":"2025-11-30","value":49986.41},{"date":"2025-12-31","value":50088.67},{"date":"2026-02-28","value":51915.09},{"date":"2026-03-31","value":50134.52},{"date":"2026-06-30","value":53969.84},{"date":"2026-07-31","value":53690.25}]};
+
+/* ── formatting ─────────────────────────────────────────────────────────── */
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const nf = (v, dp) => v.toLocaleString('en-US', { minimumFractionDigits: dp || 0, maximumFractionDigits: dp || 0 });
+const usd  = v => '$' + nf(Math.round(v));
+const usd2 = v => '$' + nf(v, 2);
+const signed = v => (v < 0 ? '−' : '+') + usd(Math.abs(v));
+const monthOf = key => { const p = key.split('-'); return MON[+p[1] - 1] + ' ' + p[0]; };
+const yearOf  = key => key.split('-')[0];
+
+const obs = new Map(D.observations.map(o => [o.date, o.value]));
+const n = D.months.length;
+const yourAt = i => { const v = obs.get(D.months[i]); return v === undefined ? null : v; };
+const lastObsBefore = i => { for (let j = i; j >= 0; j--) { const v = yourAt(j); if (v !== null) return { i: j, v: v }; } return null; };
+
+/* ── static copy driven by the data ─────────────────────────────────────── */
+document.getElementById('ref-label').textContent = D.referenceLabel;
+document.getElementById('ref-explainer').textContent = D.referenceExplainer;
+document.getElementById('th-ref').textContent = D.referenceLabel;
+document.getElementById('table-caption').textContent =
+  'Every month in the period. Your value is shown only where you recorded a balance.';
+document.getElementById('chart-desc').textContent =
+  'Line chart comparing your portfolio value against ' + D.referenceLabel + ' from ' +
+  monthOf(D.months[0]) + ' to ' + monthOf(D.months[n - 1]) + '. Your portfolio ends at ' +
+  usd2(D.endingValue) + ' from ' + D.observations.length + ' recorded balances; ' +
+  D.referenceLabel + ' ends at ' + usd2(D.referenceEndingValue) + ', a difference of ' +
+  signed(D.endingValue - D.referenceEndingValue) + '.';
+
+/* legend — built with textContent, never innerHTML */
+(function buildLegend() {
+  const host = document.getElementById('legend');
+  [
+    { name: 'Your portfolio', color: 'var(--series-you)', dot: true },
+    { name: D.referenceLabel + ' (reference)', color: 'var(--series-ref)', dot: false }
+  ].forEach(function (s) {
+    const item = document.createElement('span');
+    item.className = 'legend-item';
+    const key = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    key.setAttribute('class', 'legend-key');
+    key.setAttribute('viewBox', '0 0 26 10');
+    key.setAttribute('aria-hidden', 'true');
+    const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    ln.setAttribute('x1', 0); ln.setAttribute('x2', 26);
+    ln.setAttribute('y1', 5); ln.setAttribute('y2', 5);
+    ln.setAttribute('stroke', s.color); ln.setAttribute('stroke-width', 2);
+    key.appendChild(ln);
+    if (s.dot) {
+      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      c.setAttribute('cx', 13); c.setAttribute('cy', 5); c.setAttribute('r', 3.5);
+      c.setAttribute('fill', s.color);
+      c.setAttribute('stroke', 'var(--surface)'); c.setAttribute('stroke-width', 2);
+      key.appendChild(c);
+    }
+    item.appendChild(key);
+    const label = document.createElement('span');
+    label.textContent = s.name;
+    item.appendChild(label);
+    host.appendChild(item);
+  });
+})();
+
+/* footer meta + data-quality state */
+(function buildFoot() {
+  const foot = document.getElementById('chart-foot');
+  const bits = [
+    monthOf(D.months[0]) + ' – ' + monthOf(D.months[n - 1]),
+    D.observations.length + ' recorded balances across ' + n + ' months',
+    'dots mark months with an actual balance — nothing between them is invented',
+    'granularity: ' + D.dataQuality.granularity
+  ];
+  bits.forEach(function (t, i) {
+    const s = document.createElement('span');
+    s.textContent = (i ? '\u00b7\u00a0' : '') + t;
+    foot.appendChild(s);
+  });
+
+  const warnings = (D.dataQuality.warnings || []).slice();
+  if (D.dataQuality.balanceCount < 3) {
+    warnings.unshift('Only ' + D.dataQuality.balanceCount + ' balance rows. The shape of your line between them is unknown, and the annual figures are rough.');
+  }
+  if (warnings.length) {
+    const box = document.getElementById('dq-warning');
+    box.hidden = false;
+    warnings.forEach(function (w) {
+      const p = document.createElement('p');
+      p.className = 'warn';
+      p.style.margin = '0 0 10px';
+      p.textContent = w;
+      box.appendChild(p);
+    });
+  }
+})();
+
+/* ── the chart ──────────────────────────────────────────────────────────── */
+const NS = 'http://www.w3.org/2000/svg';
+function S(tag, attrs, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) if (attrs[k] !== null && attrs[k] !== undefined) e.setAttribute(k, attrs[k]);
+  if (text !== null && text !== undefined) e.textContent = text;
+  return e;
+}
+function niceStep(raw) {
+  const p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const m = raw / p;
+  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+}
+
+const host = document.getElementById('plot');
+const tip = document.getElementById('tip');
+let geom = null;
+
+function render() {
+  const W = Math.max(320, host.clientWidth);
+  const tiny = W < 460, narrow = W < 700;
+  const H = narrow ? 340 : 440;
+  const M = {
+    top: 28,
+    right: tiny ? 74 : (narrow ? 96 : 184),
+    bottom: 46,
+    left: narrow ? 54 : 72
+  };
+  const plotW = W - M.left - M.right;
+  const plotH = H - M.top - M.bottom;
+
+  const dataMax = Math.max.apply(null, D.reference.concat(D.observations.map(o => o.value)));
+  const yMax = dataMax * 1.07;
+  const step = niceStep(yMax / 4);
+  const x = i => M.left + (n === 1 ? 0 : (i / (n - 1)) * plotW);
+  const y = v => M.top + plotH - (v / yMax) * plotH;
+  geom = { x: x, y: y, M: M, plotW: plotW, plotH: plotH, W: W, H: H, narrow: narrow, tiny: tiny };
+
+  const old = host.querySelector('svg.chart');
+  if (old) old.remove();
+
+  const svg = S('svg', {
+    class: 'chart', viewBox: '0 0 ' + W + ' ' + H, width: W, height: H,
+    role: 'img', tabindex: '0',
+    'aria-labelledby': 'chart-title', 'aria-describedby': 'chart-desc'
+  });
+
+  /* horizontal gridlines + y ticks (recessive, solid hairlines) */
+  for (let v = 0; v <= yMax; v += step) {
+    svg.appendChild(S('line', {
+      x1: M.left, x2: M.left + plotW, y1: y(v), y2: y(v),
+      stroke: v === 0 ? 'var(--line)' : 'var(--grid)', 'stroke-width': 1
+    }));
+    svg.appendChild(S('text', {
+      class: 'axis-tick', x: M.left - 12, y: y(v) + 4, 'text-anchor': 'end'
+    }, narrow ? (v === 0 ? '$0' : '$' + (v / 1000) + 'k') : '$' + nf(v)));
+  }
+
+  /* x ticks — years, at January */
+  for (let i = 0; i < n; i++) {
+    if (D.months[i].slice(5, 7) !== '01') continue;
+    svg.appendChild(S('line', {
+      x1: x(i), x2: x(i), y1: y(0), y2: y(0) + 6,
+      stroke: 'var(--line)', 'stroke-width': 1
+    }));
+    svg.appendChild(S('text', {
+      class: 'axis-tick', x: x(i), y: y(0) + 22, 'text-anchor': 'middle'
+    }, yearOf(D.months[i])));
+  }
+  /* reference line — continuous, no markers */
+  svg.appendChild(S('polyline', {
+    fill: 'none', stroke: 'var(--series-ref)', 'stroke-width': 2,
+    'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+    points: D.reference.map((v, i) => x(i) + ',' + y(v)).join(' ')
+  }));
+
+  /* your line — observed points only, connected directly */
+  const obsPts = [];
+  for (let i = 0; i < n; i++) { const v = yourAt(i); if (v !== null) obsPts.push([i, v]); }
+  svg.appendChild(S('polyline', {
+    fill: 'none', stroke: 'var(--series-you)', 'stroke-width': 2,
+    'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+    points: obsPts.map(p => x(p[0]) + ',' + y(p[1])).join(' ')
+  }));
+  obsPts.forEach(function (p) {
+    svg.appendChild(S('circle', {
+      cx: x(p[0]), cy: y(p[1]), r: 3.5, fill: 'var(--series-you)',
+      stroke: 'var(--surface)', 'stroke-width': 2
+    }));
+  });
+
+  /* direct end labels, clear of the plot */
+  const labels = [
+    { yv: D.referenceEndingValue, color: 'var(--series-ref)', name: D.referenceLabel },
+    { yv: D.endingValue, color: 'var(--series-you)', name: 'Your portfolio' }
+  ].map(l => ({ ...l, y0: y(l.yv) }));
+
+  /* keep them apart without detaching them from their lines */
+  const blockH = tiny ? 27 : 34;
+  labels.sort((a, b) => a.y0 - b.y0);
+  let ly = labels.map(l => l.y0);
+  for (let i = 1; i < ly.length; i++) if (ly[i] - ly[i - 1] < blockH) ly[i] = ly[i - 1] + blockH;
+  const overflow = ly[ly.length - 1] - (M.top + plotH);
+  if (overflow > 0) ly = ly.map(v => v - overflow);
+
+  labels.forEach(function (l, i) {
+    const lx = M.left + plotW;
+    const tx = lx + 16;
+    /* dotted connector, so a nudged label stays attached to its line end */
+    svg.appendChild(S('path', {
+      d: 'M ' + (lx + 4) + ' ' + l.y0 + ' L ' + (tx - 5) + ' ' + ly[i],
+      fill: 'none', stroke: l.color, 'stroke-width': 1,
+      'stroke-dasharray': '1 3', opacity: 0.85
+    }));
+    svg.appendChild(S('circle', { cx: lx, cy: l.y0, r: 3.5, fill: l.color, stroke: 'var(--surface)', 'stroke-width': 2 }));
+    svg.appendChild(S('text', {
+      class: 'end-value', x: tx, y: ly[i], fill: l.color, 'text-anchor': 'start',
+      'font-size': tiny ? 14 : 17
+    }, tiny ? '$' + nf(Math.round(l.yv / 1000)) + 'k' : usd(l.yv)));
+    svg.appendChild(S('text', {
+      class: 'end-name', x: tx, y: ly[i] + (tiny ? 13 : 15), fill: l.color,
+      'text-anchor': 'start', 'font-size': tiny ? 8 : 9
+    }, tiny ? (l.name === 'Your portfolio' ? 'You' : 'Ref')
+            : narrow ? (l.name === 'Your portfolio' ? 'You' : 'Reference') : l.name));
+  });
+
+  /* crosshair layer */
+  const cross = S('g', { id: 'crosshair', opacity: 0, 'pointer-events': 'none' });
+  cross.appendChild(S('line', { id: 'cross-line', y1: M.top, y2: M.top + plotH, stroke: 'var(--muted)', 'stroke-width': 1, 'stroke-dasharray': '2 4' }));
+  cross.appendChild(S('circle', { id: 'cross-ref', r: 4.5, fill: 'var(--series-ref)', stroke: 'var(--surface)', 'stroke-width': 2 }));
+  cross.appendChild(S('circle', { id: 'cross-you', r: 4.5, fill: 'var(--series-you)', stroke: 'var(--surface)', 'stroke-width': 2 }));
+  svg.appendChild(cross);
+
+  /* one big hit area — the crosshair finds the X, the reader aims at a date */
+  const hit = S('rect', {
+    x: M.left, y: M.top, width: plotW, height: plotH, fill: 'transparent',
+    style: 'cursor:crosshair'
+  });
+  svg.appendChild(hit);
+
+  hit.addEventListener('pointermove', function (e) {
+    const r = svg.getBoundingClientRect();
+    const px = (e.clientX - r.left) * (W / r.width);
+    let i = Math.round(((px - M.left) / plotW) * (n - 1));
+    i = Math.max(0, Math.min(n - 1, i));
+    showAt(i);
+  });
+  hit.addEventListener('pointerleave', hide);
+  svg.addEventListener('blur', hide);
+  svg.addEventListener('keydown', function (e) {
+    let i = current === null ? n - 1 : current;
+    if (e.key === 'ArrowRight') i = Math.min(n - 1, i + 1);
+    else if (e.key === 'ArrowLeft') i = Math.max(0, i - 1);
+    else if (e.key === 'Home') i = 0;
+    else if (e.key === 'End') i = n - 1;
+    else if (e.key === 'Escape') { hide(); return; }
+    else return;
+    e.preventDefault();
+    showAt(i);
+  });
+
+  host.appendChild(svg);
+  if (current !== null) showAt(current);
+}
+
+/* ── crosshair + tooltip ────────────────────────────────────────────────── */
+let current = null;
+
+function hide() {
+  current = null;
+  tip.setAttribute('data-show', '0');
+  const c = document.getElementById('crosshair');
+  if (c) c.setAttribute('opacity', 0);
+}
+
+function showAt(i) {
+  current = i;
+  const g = geom;
+  const refV = D.reference[i];
+  const youV = yourAt(i);
+  const cx = g.x(i);
+
+  const c = document.getElementById('crosshair');
+  c.setAttribute('opacity', 1);
+  const cl = document.getElementById('cross-line');
+  cl.setAttribute('x1', cx); cl.setAttribute('x2', cx);
+  const cr = document.getElementById('cross-ref');
+  cr.setAttribute('cx', cx); cr.setAttribute('cy', g.y(refV));
+  const cy = document.getElementById('cross-you');
+  if (youV === null) { cy.setAttribute('opacity', 0); }
+  else { cy.setAttribute('opacity', 1); cy.setAttribute('cx', cx); cy.setAttribute('cy', g.y(youV)); }
+
+  /* tooltip content — values lead, names follow; line keys, not boxes */
+  tip.textContent = '';
+  const month = document.createElement('div');
+  month.className = 'tip-month';
+  month.textContent = monthOf(D.months[i]);
+  tip.appendChild(month);
+
+  const carried = youV === null ? lastObsBefore(i) : null;
+  addRow('var(--series-you)', youV === null ? '—' : usd2(youV), 'Your portfolio',
+    youV === null ? (carried ? 'no balance recorded · last: ' + usd(carried.v) + ', ' + monthOf(D.months[carried.i]) : 'no balance recorded yet') : null);
+  addRow('var(--series-ref)', usd2(refV), D.referenceLabel, null);
+
+  const diff = document.createElement('div');
+  diff.className = 'tip-diff';
+  const dl = document.createElement('span');
+  dl.textContent = 'Difference';
+  const dv = document.createElement('span');
+  dv.textContent = youV === null ? '—' : signed(youV - refV);
+  diff.appendChild(dl); diff.appendChild(dv);
+  tip.appendChild(diff);
+
+  /* position, flipping before it can leave the card */
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  const scale = host.clientWidth / g.W;
+  let left = cx * scale + 16;
+  if (left + tw > host.clientWidth) left = cx * scale - tw - 16;
+  left = Math.max(0, Math.min(host.clientWidth - tw, left));
+  let top = g.y(youV === null ? refV : youV) * scale - th - 14;
+  if (top < 0) top = g.y(refV) * scale + 18;
+  top = Math.max(0, Math.min(g.H * scale - th, top));
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+  tip.setAttribute('data-show', '1');
+
+  function addRow(color, value, name, note) {
+    const row = document.createElement('div');
+    row.className = 'tip-row';
+    const key = document.createElement('span');
+    key.className = 'tip-key';
+    key.style.background = color;
+    const v = document.createElement('span');
+    v.className = value === '—' ? 'tip-val is-empty' : 'tip-val';
+    v.textContent = value;
+    const nm = document.createElement('span');
+    nm.className = 'tip-name';
+    nm.textContent = name;
+    row.appendChild(key); row.appendChild(v); row.appendChild(nm);
+    tip.appendChild(row);
+    if (note) {
+      const nt = document.createElement('div');
+      nt.className = 'tip-note';
+      nt.textContent = note;
+      tip.appendChild(nt);
+    }
+  }
+}
+
+/* ── table view — the same numbers, without hovering ────────────────────── */
+(function buildTable() {
+  const body = document.getElementById('table-body');
+  for (let i = 0; i < n; i++) {
+    const youV = yourAt(i);
+    const refV = D.reference[i];
+    const tr = document.createElement('tr');
+    [
+      monthOf(D.months[i]),
+      youV === null ? '—' : usd2(youV),
+      usd2(refV),
+      youV === null ? '—' : signed(youV - refV)
+    ].forEach(function (t, ci) {
+      const cell = document.createElement(ci === 0 ? 'th' : 'td');
+      if (ci === 0) cell.setAttribute('scope', 'row');
+      cell.textContent = t;
+      tr.appendChild(cell);
+    });
+    body.appendChild(tr);
+  }
+  const btn = document.getElementById('table-toggle');
+  const view = document.getElementById('table-view');
+  btn.addEventListener('click', function () {
+    const on = btn.getAttribute('aria-pressed') === 'true';
+    btn.setAttribute('aria-pressed', String(!on));
+    view.hidden = on;
+  });
+})();
+
+render();
+let rt;
+window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(render, 120); });
+
+/* the font axes are load-bearing; prove they arrived rather than eyeballing */
+(async function proveFraunces() {
+  const probe = settings => {
+    const s = document.createElement('span');
+    s.style.cssText = 'position:absolute;visibility:hidden;font-family:Fraunces;' +
+      'font-size:120px;font-weight:300;font-variation-settings:' + settings;
+    s.textContent = 'flourish';
+    document.body.appendChild(s);
+    const w = s.getBoundingClientRect().width;
+    s.remove();
+    return w;
+  };
+  await document.fonts.ready;
+  console.log('Fraunces loaded:', document.fonts.check('300 48px Fraunces'),
+    '| variable axes live:', probe("'WONK' 1, 'SOFT' 100") !== probe("'WONK' 0, 'SOFT' 0"));
+})();
+</script>
+</body>
+</html>

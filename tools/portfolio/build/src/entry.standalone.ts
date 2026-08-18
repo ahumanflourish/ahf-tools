@@ -66,6 +66,9 @@ export function runFixture(): AnalysisResult {
 export const {
   analyse,
   deriveFindings,
+  impliedUsMarketWeight,
+  FALLBACK_US_MARKET_WEIGHT,
+  REGIONAL_TILT_THRESHOLD,
   buildStrategySeries,
   replay,
   findFlowFreeWindows,
@@ -87,5 +90,6 @@ export type {
   StrategyDef,
   StrategyResult,
   Finding,
+  MarketWeight,
   AnalysisResult,
 } from '../../core/src/index';
