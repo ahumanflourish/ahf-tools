@@ -25,6 +25,11 @@ export {
   FALLBACK_US_MARKET_WEIGHT,
   DEFAULT_MARKET_WEIGHT_WINDOW,
   REGIONAL_TILT_THRESHOLD,
+  // expense ratios — the catalogue value, the user's override, and the
+  // conversion from a fund's published all-in figure to the drag on top
+  embeddedExpenseRatio,
+  extraDrag,
+  resolveExpenseRatio,
   // strategy construction and replay
   buildStrategySeries,
   replay,
@@ -49,6 +54,8 @@ export type {
   BenchmarkData,
   StrategyDef,
   StrategyResult,
+  FundRef,
+  ExpenseRatio,
   PeriodInfo,
   Granularity,
   DataQuality,

@@ -7,6 +7,16 @@
     "GLOBAL_EQUITY": 1.0
    },
    "expenseRatio": 0,
+   "funds": [
+    {
+     "series": "GLOBAL_EQUITY",
+     "basis": "monthly",
+     "name": "Vanguard Total World Stock ETF",
+     "ticker": "VT",
+     "expenseRatio": 0.0006,
+     "asOf": "2026-06-30"
+    }
+   ],
    "rebalance": "never",
    "default": true,
    "explainer": "Every listed company in the world, weighted by size. The simplest possible 'do nothing' portfolio and the fairest yardstick for a stock-heavy strategy."
@@ -19,6 +29,32 @@
     "BOND_TOTAL": 0.2
    },
    "expenseRatio": 0,
+   "funds": [
+    {
+     "series": "GLOBAL_EQUITY",
+     "basis": "monthly",
+     "name": "Vanguard Total World Stock ETF",
+     "ticker": "VT",
+     "expenseRatio": 0.0006,
+     "asOf": "2026-06-30"
+    },
+    {
+     "series": "BOND_TOTAL",
+     "basis": "monthly",
+     "name": "Vanguard Total Bond Market ETF",
+     "ticker": "BND",
+     "expenseRatio": 0.0003,
+     "asOf": "2026-06-30"
+    },
+    {
+     "series": "BOND_TOTAL",
+     "basis": "annual",
+     "name": "Vanguard Total Bond Market Index Fund Investor Shares",
+     "ticker": "VBMFX",
+     "expenseRatio": null,
+     "note": "Investor share class, used by the annual series only for its longer history. Its expense ratio is not sourced to this build’s standard, so it is not stated."
+    }
+   ],
    "rebalance": "annual",
    "explainer": "Global stocks with a fifth in bonds. A common setting for someone decades from retirement who still wants some cushion."
   },
@@ -30,6 +66,32 @@
     "BOND_TOTAL": 0.4
    },
    "expenseRatio": 0,
+   "funds": [
+    {
+     "series": "GLOBAL_EQUITY",
+     "basis": "monthly",
+     "name": "Vanguard Total World Stock ETF",
+     "ticker": "VT",
+     "expenseRatio": 0.0006,
+     "asOf": "2026-06-30"
+    },
+    {
+     "series": "BOND_TOTAL",
+     "basis": "monthly",
+     "name": "Vanguard Total Bond Market ETF",
+     "ticker": "BND",
+     "expenseRatio": 0.0003,
+     "asOf": "2026-06-30"
+    },
+    {
+     "series": "BOND_TOTAL",
+     "basis": "annual",
+     "name": "Vanguard Total Bond Market Index Fund Investor Shares",
+     "ticker": "VBMFX",
+     "expenseRatio": null,
+     "note": "Investor share class, used by the annual series only for its longer history. Its expense ratio is not sourced to this build’s standard, so it is not stated."
+    }
+   ],
    "rebalance": "annual",
    "explainer": "The classic balanced portfolio. Lower highs and shallower lows."
   },
@@ -40,9 +102,21 @@
     "TARGET_2060": 1.0
    },
    "expenseRatio": 0,
+   "funds": [
+    {
+     "series": "TARGET_2060",
+     "basis": "monthly",
+     "name": "Vanguard Target Retirement 2060 Fund",
+     "ticker": "VTTSX",
+     "expenseRatio": 0.0008,
+     "asOf": "2026-01-28",
+     "note": "A mutual fund, not an ETF — Vanguard’s target-date series has no ETF share class."
+    }
+   ],
    "rebalance": "never",
    "explainer": "One fund that holds global stocks and bonds and gets more conservative as you age. What most 401k plans use as a default.",
-   "requiresAfter": 2012
+   "requiresAfter": 2012,
+   "caution": "These returns are Vanguard’s 2060 fund at 0.08% a year. In a 401k you get whichever 2060 fund the plan offers, and that one can cost several times more — enter its expense ratio to compare against what was on your menu."
   },
   {
    "id": "US_TOTAL",
@@ -51,6 +125,24 @@
     "US_TOTAL": 1.0
    },
    "expenseRatio": 0,
+   "funds": [
+    {
+     "series": "US_TOTAL",
+     "basis": "monthly",
+     "name": "Vanguard Total Stock Market ETF",
+     "ticker": "VTI",
+     "expenseRatio": 0.0003,
+     "asOf": "2026-06-30"
+    },
+    {
+     "series": "US_TOTAL",
+     "basis": "annual",
+     "name": "Vanguard Total Stock Market Index Fund Investor Shares",
+     "ticker": "VTSMX",
+     "expenseRatio": null,
+     "note": "Investor share class, used by the annual series only for its longer history. Its expense ratio is not sourced to this build’s standard, so it is not stated."
+    }
+   ],
    "rebalance": "never",
    "explainer": "Every US-listed company, weighted by size.",
    "caution": "US stocks beat global stocks over the last decade. Nobody knew that in advance, and the reverse has happened in other decades. Treat this as context, not as a standard your strategy should have met."
@@ -62,6 +154,24 @@
     "US_500": 1.0
    },
    "expenseRatio": 0,
+   "funds": [
+    {
+     "series": "US_500",
+     "basis": "monthly",
+     "name": "Vanguard S&P 500 ETF",
+     "ticker": "VOO",
+     "expenseRatio": 0.0003,
+     "asOf": "2026-06-30"
+    },
+    {
+     "series": "US_500",
+     "basis": "annual",
+     "name": "Vanguard 500 Index Fund Investor Shares",
+     "ticker": "VFINX",
+     "expenseRatio": null,
+     "note": "Investor share class, used by the annual series only for its longer history. Its expense ratio is not sourced to this build’s standard, so it is not stated."
+    }
+   ],
    "rebalance": "never",
    "explainer": "The 500 largest US companies.",
    "caution": "This is the single most hindsight-prone comparison available. US large caps had an exceptional run; picking them in advance would have been a concentrated bet, not prudence. Shown for context only."
@@ -73,6 +183,24 @@
     "BOND_TOTAL": 1.0
    },
    "expenseRatio": 0,
+   "funds": [
+    {
+     "series": "BOND_TOTAL",
+     "basis": "monthly",
+     "name": "Vanguard Total Bond Market ETF",
+     "ticker": "BND",
+     "expenseRatio": 0.0003,
+     "asOf": "2026-06-30"
+    },
+    {
+     "series": "BOND_TOTAL",
+     "basis": "annual",
+     "name": "Vanguard Total Bond Market Index Fund Investor Shares",
+     "ticker": "VBMFX",
+     "expenseRatio": null,
+     "note": "Investor share class, used by the annual series only for its longer history. Its expense ratio is not sourced to this build’s standard, so it is not stated."
+    }
+   ],
    "rebalance": "never",
    "explainer": "The whole US investment-grade bond market. Useful as a floor reference."
   }

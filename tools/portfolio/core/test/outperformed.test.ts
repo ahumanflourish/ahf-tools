@@ -119,6 +119,7 @@ describe('outperformed: the tool can say "you did fine"', () => {
     // from balances without reverse-engineering the benchmark series.
     const flat: StrategyResult = {
       id: 'GLOBAL_EQUITY', label: 'Global stock market',
+      expenseRatio: { extra: 0, embedded: null, allIn: null, source: 'catalogue' },
       endingValue: 50_000, xirr: 0.1, vsYou: 0, path: [], annual: {},
     };
     const tie = {

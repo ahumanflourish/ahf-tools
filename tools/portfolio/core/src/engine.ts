@@ -49,6 +49,28 @@ export interface PortfolioInput {
    * what "market weight" means, and this is a judgement input, not a fact.
    */
   usMarketWeight?: number;
+  /**
+   * Optional: extra annual drag to apply to a reference strategy, keyed by
+   * strategy id, as a fraction. Overrides that strategy's catalogue
+   * `expenseRatio`; an absent key means the catalogue value stands.
+   *
+   * WHY THIS IS AN INPUT. The component series are real funds' total returns,
+   * already net of those funds' own expenses, so the catalogue value is 0 and
+   * the reference is priced at the cheapest share class we could source. Real
+   * menus are not. A 2060 target-date fund runs from 0.08% to about 0.75%
+   * depending on the plan, and over a long history that choice moves the
+   * headline "you gave up $X" figure more than most of the maths does. The
+   * user knows which fund they could actually have bought; the tool does not.
+   *
+   * UNITS. This is drag ON TOP of what is already inside the series, the same
+   * quantity `StrategyDef.expenseRatio` carries — not the fund's all-in fee.
+   * Given an all-in figure, convert it with `extraDrag`, which subtracts the
+   * ratio already embedded in the series. Negative values are accepted and
+   * meaningful: a plan offering a cheaper institutional share class makes the
+   * reference genuinely better, and refusing to model that would bias the tool
+   * toward manufacturing a larger gap.
+   */
+  expenseRatios?: Record<string, number>;
 }
 
 /** Monthly returns keyed `YYYY-MM`; annual keyed `YYYY`. Values are percent. */
@@ -58,6 +80,40 @@ export interface BenchmarkData {
   monthly: Record<string, Record<string, number>>;
 }
 
+/**
+ * A real fund whose total returns one of a strategy's component series is
+ * made of.
+ *
+ * The point of naming it is that a user cannot otherwise tell whether the
+ * reference resembles what they hold: "one fund that holds global stocks and
+ * bonds" describes a category spanning 0.08% to 0.75% a year. Structured
+ * rather than prose so a UI can render "Vanguard Target Retirement 2060
+ * (VTTSX), 0.08%" and prefill the expense-ratio input with the same number.
+ */
+export interface FundRef {
+  /** Component series id this share class supplies — a key of `weights`. */
+  series: string;
+  /**
+   * Which shipped series it supplies. The strategy maths reads `data.monthly`
+   * and nothing else, so the `monthly` entry is the fund a user is actually
+   * measured against; `annual` entries are provenance for the long series,
+   * which uses different share classes (mutual funds, not ETFs).
+   */
+  basis: 'monthly' | 'annual';
+  /** Fund name as its provider writes it. */
+  name: string;
+  ticker: string;
+  /**
+   * The fund's OWN expense ratio as a fraction — already inside the series'
+   * returns, never applied a second time. Null where it could not be sourced
+   * to the standard the rest of this data is held to; see `note`.
+   */
+  expenseRatio: number | null;
+  /** As-of date for `expenseRatio`, ISO. Fees change; a bare number cannot say when. */
+  asOf?: string;
+  note?: string;
+}
+
 export interface StrategyDef {
   id: string;
   label: string;
@@ -65,8 +121,20 @@ export interface StrategyDef {
   weights: Record<string, number>;
   /** ADDITIONAL annual drag beyond what is already inside the component series.
    *  Component series are fund total returns, already net of fund expenses,
-   *  so this is normally 0. Use it for platform fees layered on top. */
+   *  so this is normally 0 — and 0 throughout the shipped catalogue, which
+   *  therefore prices every reference at the cheapest share class we could
+   *  source. Use it for platform fees layered on top, or let the user override
+   *  it per strategy with `PortfolioInput.expenseRatios` when their plan's
+   *  version of the same fund costs more. `funds` below says what the 0 is
+   *  additional TO. */
   expenseRatio: number;
+  /**
+   * The funds the component series are, for display and for `extraDrag`.
+   * Optional so a hand-built def (tests, a UI experiment) needs no catalogue
+   * entry; when absent the all-in figures in `ExpenseRatio` report null rather
+   * than guessing.
+   */
+  funds?: FundRef[];
   rebalance?: 'annual' | 'monthly' | 'never';
   /** Shown to the user before they select it. */
   explainer: string;
@@ -74,9 +142,39 @@ export interface StrategyDef {
   caution?: string;
 }
 
+/**
+ * The cost the reference was actually measured at, with its provenance.
+ *
+ * Same shape of promise as `MarketWeight`: a value plus where it came from, so
+ * the UI can display the number it used and say whether the user supplied it.
+ */
+export interface ExpenseRatio {
+  /**
+   * Extra annual drag applied on top of the component series, as a fraction.
+   * This is the figure `buildStrategySeries` compounded.
+   */
+  extra: number;
+  /**
+   * The funds' own expense ratio already inside the series, weighted by the
+   * strategy's weights. Null unless every component the strategy uses names a
+   * fund with a sourced ratio.
+   */
+  embedded: number | null;
+  /**
+   * `embedded + extra` — the all-in annual cost the reference was measured at,
+   * and the figure comparable with a fund's published expense ratio. Null
+   * whenever `embedded` is.
+   */
+  allIn: number | null;
+  /** `user` when `input.expenseRatios` supplied `extra`, else `catalogue`. */
+  source: 'user' | 'catalogue';
+}
+
 export interface StrategyResult {
   id: string;
   label: string;
+  /** What this strategy cost in the run that produced these figures. */
+  expenseRatio: ExpenseRatio;
   endingValue: number;
   xirr: number;
   /** Ending value minus the user's ending value. */
@@ -416,6 +514,63 @@ export function buildStrategySeries(
 }
 
 /**
+ * The expense ratio already inside a strategy's returns: each component
+ * series' fund ratio, weighted by that component's weight.
+ *
+ * Returns null unless every component the strategy actually uses has a
+ * `monthly` fund carrying a sourced ratio — a partial sum would understate the
+ * cost of the blend while looking like a complete answer.
+ */
+export function embeddedExpenseRatio(def: StrategyDef): number | null {
+  let total = 0;
+  for (const [series, weight] of Object.entries(def.weights)) {
+    const fund = def.funds?.find((f) => f.series === series && f.basis === 'monthly');
+    if (!fund || fund.expenseRatio == null) return null;
+    total += fund.expenseRatio * weight;
+  }
+  return total;
+}
+
+/**
+ * Convert a fund's published all-in expense ratio into the extra drag
+ * `PortfolioInput.expenseRatios` takes.
+ *
+ * The user knows what their plan's fund costs, not how much dearer it is than
+ * the share class we sourced; this is the subtraction between the two, and it
+ * lives here so no caller has to know that the series is already net of fees.
+ *
+ * Deliberately NOT clamped at zero. A plan offering a cheaper institutional
+ * share class makes the achievable reference better, and a tool that could
+ * only ever be told the reference was worse would be one that manufactures
+ * grievance. Falls back to the raw figure when the embedded ratio is unknown,
+ * which overstates the drag by the fund's own fee — a few basis points, and
+ * visible as `allIn: null` on the result.
+ */
+export function extraDrag(def: StrategyDef, fundExpenseRatio: number): number {
+  return fundExpenseRatio - (embeddedExpenseRatio(def) ?? 0);
+}
+
+/**
+ * Resolve the drag one strategy is priced at for this run: the user's override
+ * when they gave one, the catalogue value otherwise, plus the embedded and
+ * all-in figures a UI needs to display either honestly.
+ */
+export function resolveExpenseRatio(
+  def: StrategyDef,
+  overrides?: Record<string, number>,
+): ExpenseRatio {
+  const given = overrides?.[def.id];
+  const extra = given == null ? def.expenseRatio : given;
+  const embedded = embeddedExpenseRatio(def);
+  return {
+    extra,
+    embedded,
+    allIn: embedded == null ? null : embedded + extra,
+    source: given == null ? 'catalogue' : 'user',
+  };
+}
+
+/**
  * Replay a set of cash flows into a return series.
  * Flows are applied with a half-month convention by default, which matches
  * how most people actually contribute (spread through the month).
@@ -703,7 +858,9 @@ export type AnalysisErrorCode =
   /** History opens before the monthly benchmark series does. */
   | 'history-before-coverage'
   /** History closes after the monthly benchmark series does. */
-  | 'history-after-coverage';
+  | 'history-after-coverage'
+  /** An `expenseRatios` entry is not a usable annual drag. */
+  | 'invalid-expense-ratio';
 
 /**
  * Thrown by `analyse` for inputs it will not compute on.
@@ -729,6 +886,8 @@ export class AnalysisError extends Error {
   readonly coveredTo?: string | null;
   /** Balance rows supplied. `insufficient-balances` only. */
   readonly balanceCount?: number;
+  /** Strategy id whose expense-ratio override was rejected. */
+  readonly strategyId?: string;
 
   constructor(
     code: AnalysisErrorCode,
@@ -1052,6 +1211,22 @@ export function analyse(
     }))
     .sort((a, b) => a.date.getTime() - b.date.getTime());
 
+  // Validated before anything expensive runs, and loudly rather than by
+  // falling back: a user who typed 75 for 0.75% has asked a different question
+  // from the one a silent default would answer. Keys naming a strategy that
+  // is not in this run are left alone — a UI may carry overrides for the whole
+  // catalogue while the user has only selected some of it.
+  for (const [id, value] of Object.entries(input.expenseRatios ?? {})) {
+    if (!Number.isFinite(value) || value <= -1 || value >= 1) {
+      throw new AnalysisError(
+        'invalid-expense-ratio',
+        `Expense ratio for ${id} is ${value}. It must be an annual fraction ` +
+          'greater than -1 and less than 1 — 0.0075 for a fund charging 0.75%.',
+        { strategyId: id },
+      );
+    }
+  }
+
   const balances = input.rows
     .filter((r) => r.type === 'balance')
     .map((r) => ({ date: toDate(r.date), value: r.amount }))
@@ -1221,7 +1396,14 @@ export function analyse(
   }
 
   const results: StrategyResult[] = strategies.map((def) => {
-    const series = buildStrategySeries(def, data, months);
+    // The catalogue prices every reference at the cheapest share class we
+    // could source, which is what the series is; the override is how a user
+    // says what their own plan actually offered. Applied by substitution so
+    // `buildStrategySeries` keeps its single, already-verified fee path.
+    const expenseRatio = resolveExpenseRatio(def, input.expenseRatios);
+    const priced: StrategyDef =
+      expenseRatio.extra === def.expenseRatio ? def : { ...def, expenseRatio: expenseRatio.extra };
+    const series = buildStrategySeries(priced, data, months);
     // The reference is given the same money on the same days, opening position
     // included — otherwise a lump-sum history would be compared against a
     // strategy that was never funded and would end at zero.
@@ -1247,7 +1429,7 @@ export function analyse(
       ann[y] = g - 1;
     }
     return {
-      id: def.id, label: def.label, endingValue: ending, xirr: xirr(cf),
+      id: def.id, label: def.label, expenseRatio, endingValue: ending, xirr: xirr(cf),
       vsYou: ending - endingValue, path, annual: ann,
     };
   });
