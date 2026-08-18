@@ -256,6 +256,8 @@ svg.chart:focus-visible { outline: var(--border-thick) dotted var(--accent); out
 }
 .tip-val.is-empty { color: var(--subtle); font-weight: 500; }
 .tip-name { font-size: var(--text-meta); color: var(--muted); line-height: 1.35; white-space: nowrap; }
+/* One name is a phrase rather than a word, and is allowed the second line. */
+.tip-name.is-wrap { white-space: normal; }
 .tip-note { font-size: var(--text-meta); color: var(--subtle); }
 .tip-diff {
   margin-top: 8px; padding-top: 7px;
@@ -339,9 +341,12 @@ a:hover { color: var(--accent); text-decoration-style: solid; }
 }
 
 /* ── The picker ─────────────────────────────────────────────────────────
-   Every explainer opens in place, beside the chart it changes. Nothing here
-   hides behind a hover: a row is open when it is chosen, when its + is
-   pressed, or when its checkbox takes focus. Cautions never close at all. */
+   A list of things not yet drawn, so it stays light: each row carries an (i)
+   for what the strategy is and, where one exists, a warning triangle for its
+   caution. Both open in a popover beside the row. Nothing here hides behind a
+   hover — a click opens either one, on any device. The caution that belongs to
+   a line actually on the chart is not in here at all: it is the strip above
+   the plot, in full, for as long as the line is drawn. */
 .rail-head { margin-bottom: 10px; }
 .rail-head .label, .rail-sub .label { margin-bottom: 7px; }
 .rail-note { margin: 0; font-size: var(--text-meta); line-height: 1.5; color: var(--muted); }
@@ -359,6 +364,7 @@ a:hover { color: var(--accent); text-decoration-style: solid; }
 
 .refs { list-style: none; margin: 9px 0 0; padding: 0; }
 .ref {
+  position: relative;
   padding: 7px 9px 8px; margin-bottom: 2px;
   border: var(--border-thin) dotted transparent;
   border-bottom-color: var(--line-soft);
@@ -389,61 +395,58 @@ a:hover { color: var(--accent); text-decoration-style: solid; }
 .ref-label input:checked { border-color: var(--ink); background: var(--ink); }
 .ref-label input:disabled { border-style: dashed; }
 .ref-key { display: block; width: 28px; height: 10px; flex: none; }
-.ref-more {
-  flex: none; width: 20px; height: 20px; padding: 0; line-height: 1;
+/* Two disclosures, one grammar. They sit in their own group with real space
+   between them so a thumb cannot take the wrong one, and outside the <label>
+   so neither can ever tick the box. */
+.ref-tools { display: flex; align-items: center; gap: 10px; flex: none; }
+.ref-pop-btn {
+  display: grid; place-items: center;
+  width: 24px; height: 24px; padding: 0; flex: none;
   background: transparent; cursor: pointer; color: var(--muted);
   border: var(--border-thin) dotted var(--line); border-radius: var(--radius);
-  font-family: inherit; font-size: var(--text-control); font-weight: 600;
-  transition: border-color var(--fast) var(--ease), color var(--fast) var(--ease);
+  transition: border-color var(--fast) var(--ease), color var(--fast) var(--ease),
+              background-color var(--fast) var(--ease);
 }
-.ref-more:hover { border-style: solid; color: var(--ink); }
+.ref-pop-btn svg { display: block; }
+.ref-pop-btn:hover { border-style: solid; color: var(--ink); }
+.ref-pop-btn[aria-expanded="true"] {
+  border-style: solid; border-color: var(--ink); color: var(--ink);
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+}
+/* The triangle is a warning by its shape first. Terracotta agrees with it;
+   it is never the only thing saying so. */
+.ref-pop-btn.is-caution { color: var(--attention); border-color: var(--attention); }
+.ref-pop-btn.is-caution:hover,
+.ref-pop-btn.is-caution[aria-expanded="true"] {
+  color: var(--attention); border-color: var(--attention);
+}
 
-.ref-explainer {
-  display: none; margin: 7px 0 0 23px;
+/* The panel. Raised off the page by its border and surface, never a shadow. */
+.ref-pop {
+  position: absolute; z-index: 4; left: 0; right: 0; top: calc(100% + 4px);
+  padding: 9px 11px 10px;
+  background: var(--surface-raised);
+  border: var(--border-normal) solid var(--ink);
+  border-radius: var(--radius);
   font-size: 12.5px; line-height: 1.45; color: var(--muted);
+  /* A ring of the page colour, so a panel sitting over a row below it reads as
+     lifted off the rail rather than colliding with it. Borders are this
+     brand's elevation system; there is still no shadow anywhere. */
+  outline: 5px solid var(--surface);
+  animation: pop-in var(--fast) var(--ease);
 }
-.ref[data-open="1"] .ref-explainer,
-.ref:has(.ref-label input:focus) .ref-explainer { display: block; }
-.ref-caution {
-  margin: 8px 0 0 23px; padding: 7px 9px;
-  border-left: var(--border-thick) solid var(--attention);
-  background: var(--attention-soft);
-  font-size: var(--text-meta); line-height: 1.45; color: var(--muted);
-}
-.ref-caution b {
+.ref-pop[data-flip="up"] { top: auto; bottom: calc(100% + 4px); }
+.ref-pop.is-caution { border-color: var(--attention); background: var(--attention-soft); }
+.ref-pop.is-caution b {
   display: block; font-weight: 600; color: var(--ink);
   font-size: var(--text-micro); text-transform: uppercase;
-  letter-spacing: var(--tracking-micro); margin-bottom: 2px;
+  letter-spacing: var(--tracking-micro); margin-bottom: 3px;
 }
+@keyframes pop-in { from { opacity: 0; } to { opacity: 1; } }
 .ref-reason {
   margin: 8px 0 0 23px;
   font-size: var(--text-meta); line-height: 1.4; color: var(--subtle); font-style: italic;
 }
-
-/* ── The catalogue below — the same seven, described at length ─────────── */
-.catalogue { margin-top: 44px; }
-.catalogue .label { margin-bottom: 10px; }
-.cat-note { margin: 0 0 18px; max-width: 68ch; color: var(--muted); font-size: 14px; line-height: 1.55; }
-.cat-list {
-  list-style: none; margin: 0; padding: 0;
-  display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-@media (max-width: 860px) { .cat-list { grid-template-columns: minmax(0, 1fr); } }
-.cat-item { border: var(--border-thin) dotted var(--line); padding: 14px 16px; }
-.cat-name { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); }
-.cat-explainer { margin: 7px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--muted); }
-.cat-caution {
-  margin: 10px 0 0; padding: 8px 10px;
-  border-left: var(--border-thick) solid var(--attention);
-  background: var(--attention-soft);
-  font-size: var(--text-meta); line-height: 1.5; color: var(--muted);
-}
-.cat-caution b {
-  display: block; font-weight: 600; color: var(--ink);
-  font-size: var(--text-label); text-transform: uppercase;
-  letter-spacing: var(--tracking-micro); margin-bottom: 3px;
-}
-.cat-reason { margin: 9px 0 0; font-size: var(--text-meta); line-height: 1.45; color: var(--subtle); font-style: italic; }
 
 /* Caution strip — sits with the chart, for as long as the strategy is on it.
    Not dismissable: there is no control here to dismiss it with. */
@@ -486,9 +489,17 @@ th.col-start, td.col-start { border-left: var(--border-thin) dotted var(--line-s
   .page { padding: 32px 20px 64px; }
   .card { padding: 20px 16px 18px; }
   .masthead { margin-bottom: 14px; }
-  .cat-item { padding: 12px 13px; }
   .ref { padding: 7px 6px 8px; }
-  .ref-explainer, .ref-reason, .ref-caution { margin-left: 0; }
+  .ref-reason { margin-left: 0; }
+  .ref-tools { gap: 14px; }
+}
+
+/* Fingers, not pointers. Keyed to the input device rather than the viewport,
+   because a tablet at 800px is still being tapped: bigger targets, and more
+   air between the two so a thumb cannot take the wrong one. */
+@media (pointer: coarse) {
+  .ref-tools { gap: 14px; }
+  .ref-pop-btn { width: 32px; height: 32px; }
 }
 
 /* The user drove the change, so the chart confirms it at the fast duration.
@@ -546,12 +557,11 @@ svg.chart.is-swap { animation: chart-swap var(--fast) var(--ease); }
         <div class="rail-head">
           <p class="label" id="picker-title">Compare against</p>
           <p class="rail-note">Your own line is always drawn. Add up to <strong>three</strong> references &mdash;
-            same money in, same money out, same months. Press <span aria-hidden="true">+</span> to read one before
-            you choose it; choosing it opens it too.</p>
+            same money in, same money out, same months. Every row will tell you what it is, and flags a caution
+            where there is one, before you choose it.</p>
           <p class="slot-count" id="slot-count"></p>
-          <p class="cap-note" id="cap-note" hidden>All three reference slots are full. Three is the limit because
-            the brand palette holds four line colours that stay apart from one another, and your own line uses one
-            of them. Uncheck one to swap another in.</p>
+          <p class="cap-note" id="cap-note" hidden>All three reference slots are full. Past three, the lines get
+            hard to tell apart. Uncheck one to swap another in.</p>
         </div>
         <ul class="refs" id="refs" aria-labelledby="picker-title"></ul>
 
@@ -572,13 +582,6 @@ svg.chart.is-swap { animation: chart-swap var(--fast) var(--ease); }
         <tbody id="table-body"></tbody>
       </table>
     </div>
-  </section>
-
-  <section class="catalogue" aria-labelledby="cat-title">
-    <p class="label" id="cat-title">Every reference, in full</p>
-    <p class="cat-note">The same seven strategies, at length. Choosing happens beside the chart, where each one is
-      also described; this is here to read.</p>
-    <ul class="cat-list" id="cat-list"></ul>
   </section>
 
   <p class="visually-hidden" id="sel-live" role="status" aria-live="polite"></p>
@@ -624,7 +627,7 @@ const lastObsBefore = i => { for (let j = i; j >= 0; j--) { const v = yourAt(j);
 
 const byId = new Map(D.strategies.map(s => [s.id, s]));
 
-/* ── money you put in ───────────────────────────────────────────────────
+/* ── contributions & withdrawals ────────────────────────────────────────
    Contributions minus withdrawals, running in date order. It is flat between
    the dates money actually moved, so it is drawn as a step and never as a
    diagonal — a diagonal would invent a contribution schedule nobody had. It
@@ -677,7 +680,7 @@ const SLOTS = [
 const MAX_REFS = SLOTS.length;
 const YOU = { color: 'var(--series-you)', dash: null };
 
-/* short forms, used only where the gutter is too narrow for the catalogue name */
+/* short forms, used only where the gutter is too narrow for the full name */
 const SHORT = {
   GLOBAL_EQUITY: 'Global stocks', GLOBAL_8020: 'Global 80/20', GLOBAL_6040: 'Global 60/40',
   TARGET_2060: 'Target 2060', US_TOTAL: 'US stocks', US_500: 'S&P 500', ALL_BONDS: 'All bonds'
@@ -738,11 +741,11 @@ function toggle(id) {
 }
 
 /* ── the picker, beside the chart ───────────────────────────────────────
-   Every explainer is rendered here, in the DOM, next to the plot. A row opens
-   when it is chosen, when its + is pressed, or when its checkbox takes focus
-   — never on hover alone. Cautions and blocked reasons never close. */
+   Every explainer and every caution is rendered here, in the DOM, next to the
+   plot — each behind its own button rather than laid out at length, because
+   nothing in this list is drawn yet. Blocked reasons still never close: a row
+   you cannot choose says why, inline, always. */
 const refEls = new Map();
-const expanded = new Set();
 
 function keyLine(svg, color, dash) {
   svg.textContent = '';
@@ -768,6 +771,128 @@ function keyArea(svg) {
   svg.appendChild(r); svg.appendChild(ln);
 }
 
+/* ── one popover, used twice ────────────────────────────────────────────
+   The (i) and the warning triangle are the same disclosure: a real <button>
+   carrying aria-expanded over a panel that is `hidden` while closed, so the
+   text is in the accessibility tree exactly when it is on screen and the
+   button is tabbable and operable by Enter or Space. A click toggles it — the
+   only gesture that exists on a touch screen. A mouse may also open it by
+   hovering, but nothing whatsoever depends on hover. Escape closes it and
+   hands focus back to the button, a click anywhere else closes it, and opening
+   either one closes whatever was open. */
+let popOpen = null;   /* { btn, panel, pinned } */
+let popTimer = null;
+
+function closePop() {
+  if (!popOpen) return;
+  popOpen.panel.hidden = true;
+  popOpen.panel.removeAttribute('data-flip');
+  popOpen.btn.setAttribute('aria-expanded', 'false');
+  popOpen = null;
+}
+
+function showPop(btn, panel, pinned) {
+  if (popOpen && popOpen.btn === btn) { popOpen.pinned = popOpen.pinned || !!pinned; return; }
+  closePop();
+  panel.hidden = false;
+  btn.setAttribute('aria-expanded', 'true');
+  popOpen = { btn: btn, panel: panel, pinned: !!pinned };
+  /* A panel that would hang off the end of its own list lands on whatever
+     comes next — a section heading, the edge of the window — and reads as a
+     mistake. Where the list has the height for it, open upward instead and
+     cover rows, which is what an overlay is for. */
+  const list = panel.closest('ul');
+  const pr = panel.getBoundingClientRect();
+  const br = btn.getBoundingClientRect();
+  const lr = list ? list.getBoundingClientRect() : null;
+  const overhangs = (lr && pr.bottom > lr.bottom + 2) || pr.bottom > window.innerHeight - 8;
+  const roomAbove = lr && br.top - lr.top >= pr.height + 10;
+  if (overhangs && roomAbove) panel.setAttribute('data-flip', 'up');
+}
+
+function schedulePopClose() {
+  clearTimeout(popTimer);
+  popTimer = setTimeout(function () { if (popOpen && !popOpen.pinned) closePop(); }, 160);
+}
+
+/* icons — the triangle reads as a warning by shape before it reads as a
+   colour, and the circle is a different shape entirely, not a tinted twin */
+function popIcon(kind) {
+  const svg = S('svg', { viewBox: '0 0 14 14', width: 14, height: 14, 'aria-hidden': 'true' });
+  if (kind === 'caution') {
+    svg.appendChild(S('path', {
+      d: 'M7 1.4 L13.1 12.4 L0.9 12.4 Z', fill: 'none', stroke: 'currentColor',
+      'stroke-width': 1.4, 'stroke-linejoin': 'round'
+    }));
+    svg.appendChild(S('line', {
+      x1: 7, y1: 5.6, x2: 7, y2: 8.9, stroke: 'currentColor',
+      'stroke-width': 1.4, 'stroke-linecap': 'round'
+    }));
+    svg.appendChild(S('circle', { cx: 7, cy: 10.6, r: 0.85, fill: 'currentColor' }));
+  } else {
+    svg.appendChild(S('circle', { cx: 7, cy: 7, r: 6, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.4 }));
+    svg.appendChild(S('circle', { cx: 7, cy: 4.1, r: 0.85, fill: 'currentColor' }));
+    svg.appendChild(S('line', {
+      x1: 7, y1: 6.3, x2: 7, y2: 10.4, stroke: 'currentColor',
+      'stroke-width': 1.4, 'stroke-linecap': 'round'
+    }));
+  }
+  return svg;
+}
+
+function popButton(kind, label, panelId) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'ref-pop-btn' + (kind === 'caution' ? ' is-caution' : '');
+  b.setAttribute('aria-expanded', 'false');
+  b.setAttribute('aria-controls', panelId);
+  b.setAttribute('aria-label', label);
+  b.appendChild(popIcon(kind));
+  const panel = function () { return document.getElementById(panelId); };
+  b.addEventListener('click', function () {
+    if (popOpen && popOpen.btn === b && popOpen.pinned) closePop();
+    else showPop(b, panel(), true);
+  });
+  b.addEventListener('pointerenter', function (e) {
+    if (e.pointerType !== 'mouse') return;
+    clearTimeout(popTimer);
+    showPop(b, panel(), false);
+  });
+  b.addEventListener('pointerleave', schedulePopClose);
+  return b;
+}
+
+function popPanel(id, cls, head, text) {
+  const p = document.createElement('div');
+  p.className = cls;
+  p.id = id;
+  p.hidden = true;
+  if (head) {
+    p.setAttribute('role', 'note');
+    const b = document.createElement('b');
+    b.textContent = head;
+    p.appendChild(b);
+  }
+  const t = document.createElement('span');
+  t.textContent = text;
+  p.appendChild(t);
+  p.addEventListener('pointerenter', function () { clearTimeout(popTimer); });
+  p.addEventListener('pointerleave', schedulePopClose);
+  return p;
+}
+
+document.addEventListener('click', function (e) {
+  if (!popOpen) return;
+  if (e.target.closest && (e.target.closest('.ref-pop') || e.target.closest('.ref-pop-btn'))) return;
+  closePop();
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape' || !popOpen) return;
+  const b = popOpen.btn;
+  closePop();
+  b.focus();
+});
+
 function buildRow(host, id, label, explainer, caution) {
   const li = document.createElement('li');
   li.className = 'ref';
@@ -783,6 +908,14 @@ function buildRow(host, id, label, explainer, caution) {
   const name = document.createElement('span');
   name.textContent = label;
   lab.appendChild(box); lab.appendChild(name);
+  /* The caution is in the accessibility tree before any panel is opened: it is
+     part of the checkbox's own name, so it cannot be missed by not looking. */
+  if (caution) {
+    const flag = document.createElement('span');
+    flag.className = 'visually-hidden';
+    flag.textContent = ' \u2014 carries a caution';
+    lab.appendChild(flag);
+  }
   line.appendChild(lab);
 
   const key = document.createElementNS(NS, 'svg');
@@ -791,33 +924,20 @@ function buildRow(host, id, label, explainer, caution) {
   key.setAttribute('aria-hidden', 'true');
   line.appendChild(key);
 
-  const more = document.createElement('button');
-  more.type = 'button';
-  more.className = 'ref-more';
-  more.textContent = '+';
-  more.setAttribute('aria-expanded', 'false');
-  more.setAttribute('aria-controls', 'exp-' + id);
-  more.setAttribute('aria-label', 'What ' + label + ' is');
-  line.appendChild(more);
+  const tools = document.createElement('div');
+  tools.className = 'ref-tools';
+  const info = popButton('info', 'What ' + label + ' is', 'exp-' + id);
+  tools.appendChild(info);
+  let warn = null;
+  if (caution) {
+    warn = popButton('caution', 'Caution about ' + label, 'cau-' + id);
+    tools.appendChild(warn);
+  }
+  line.appendChild(tools);
   li.appendChild(line);
 
-  const exp = document.createElement('p');
-  exp.className = 'ref-explainer';
-  exp.id = 'exp-' + id;
-  exp.textContent = explainer;
-  li.appendChild(exp);
-
-  if (caution) {
-    const cau = document.createElement('div');
-    cau.className = 'ref-caution';
-    cau.id = 'cau-' + id;
-    const b = document.createElement('b');
-    b.textContent = 'Caution';
-    const t = document.createElement('span');
-    t.textContent = caution;
-    cau.appendChild(b); cau.appendChild(t);
-    li.appendChild(cau);
-  }
+  li.appendChild(popPanel('exp-' + id, 'ref-pop', null, explainer));
+  if (caution) li.appendChild(popPanel('cau-' + id, 'ref-pop is-caution', 'Caution', caution));
 
   const reason = document.createElement('p');
   reason.className = 'ref-reason';
@@ -827,27 +947,28 @@ function buildRow(host, id, label, explainer, caution) {
 
   box.setAttribute('aria-describedby',
     ['exp-' + id, caution ? 'cau-' + id : null, 'why-' + id].filter(Boolean).join(' '));
-  more.addEventListener('click', function () {
-    if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
-    paintRefs();
-  });
 
   host.appendChild(li);
-  return { li: li, box: box, key: key, reason: reason, more: more };
+  return { li: li, box: box, key: key, reason: reason, info: info, warn: warn };
 }
 
+/* The user's own CSV calls these rows `contribution` and `withdrawal`, so the
+   chart calls them that too. One compact form exists for the places a phrase
+   will not fit, and there is no third name anywhere. */
+const MONEY_IN_LABEL = 'Contributions & withdrawals';
+const MONEY_IN_SHORT = 'Net contributions';
 const MONEY_IN_EXPLAINER = 'Contributions minus withdrawals as a running total, stepping only on the dates ' +
   'money actually moved. The gap between it and your own line is your gain.';
 
 (function buildRail() {
   const ctx = buildRow(document.getElementById('context-list'), 'MONEY_IN',
-    'Money you put in', MONEY_IN_EXPLAINER, null);
+    MONEY_IN_LABEL, MONEY_IN_EXPLAINER, null);
   ctx.li.setAttribute('data-kind', 'context');
   ctx.box.addEventListener('change', function () {
     showMoneyIn = ctx.box.checked;
     update(true, showMoneyIn
-      ? 'Money you put in is drawn on the chart, ending at ' + usd2(netIn) + '.'
-      : 'Money you put in is no longer drawn.');
+      ? MONEY_IN_LABEL + ' are drawn on the chart, ending at a net ' + usd2(netIn) + '.'
+      : MONEY_IN_LABEL + ' are no longer drawn.');
   });
   refEls.set('MONEY_IN', ctx);
 
@@ -859,55 +980,10 @@ const MONEY_IN_EXPLAINER = 'Contributions minus withdrawals as a running total, 
   });
 })();
 
-/* The same seven again, below the card, at length and with nothing to press.
-   The picker is the control; this is the reading copy. */
-(function buildCatalogue() {
-  const host = document.getElementById('cat-list');
-  D.strategies.forEach(function (s) {
-    const li = document.createElement('li');
-    li.className = 'cat-item';
-
-    const h = document.createElement('p');
-    h.className = 'cat-name';
-    h.textContent = s.label;
-    li.appendChild(h);
-
-    const e = document.createElement('p');
-    e.className = 'cat-explainer';
-    e.textContent = s.explainer;
-    li.appendChild(e);
-
-    if (s.caution) {
-      const cau = document.createElement('div');
-      cau.className = 'cat-caution';
-      const b = document.createElement('b');
-      b.textContent = 'Caution';
-      const t = document.createElement('span');
-      t.textContent = s.caution;
-      cau.appendChild(b); cau.appendChild(t);
-      li.appendChild(cau);
-    }
-
-    const era = eraBlock(s);
-    if (era) {
-      const r = document.createElement('p');
-      r.className = 'cat-reason';
-      r.textContent = era;
-      li.appendChild(r);
-    }
-    host.appendChild(li);
-  });
-})();
-
 function paintRefs() {
   const money = refEls.get('MONEY_IN');
-  const moneyOpen = showMoneyIn || expanded.has('MONEY_IN');
   money.box.checked = showMoneyIn;
   money.li.setAttribute('data-state', showMoneyIn ? 'on' : 'off');
-  money.li.setAttribute('data-open', moneyOpen ? '1' : '0');
-  money.more.hidden = showMoneyIn;
-  money.more.textContent = moneyOpen ? '\u2212' : '+';
-  money.more.setAttribute('aria-expanded', String(moneyOpen));
   if (showMoneyIn) keyArea(money.key); else money.key.textContent = '';
 
   const full = slots.indexOf(null) < 0;
@@ -917,15 +993,10 @@ function paintRefs() {
     const era = eraBlock(s);
     const on = at >= 0;
     const blocked = !!era || (!on && full);
-    const open = on || expanded.has(s.id);
 
     el.box.checked = on;
     el.box.disabled = blocked;
     el.li.setAttribute('data-state', on ? 'on' : blocked ? 'blocked' : 'off');
-    el.li.setAttribute('data-open', open ? '1' : '0');
-    el.more.hidden = on;
-    el.more.textContent = open ? '\u2212' : '+';
-    el.more.setAttribute('aria-expanded', String(open));
 
     if (on) keyLine(el.key, SLOTS[at].color, SLOTS[at].dash);
     else el.key.textContent = '';
@@ -1001,7 +1072,7 @@ function paintCopy() {
     (c.length ? ', against ' + c.length + ' reference ' + (c.length === 1 ? 'strategy' : 'strategies') + ': ' +
       c.map(x => x.s.label + ' ending at ' + usd2(x.s.endingValue) + ', a difference of ' +
         signed(D.endingValue - x.s.endingValue)).join('; ') : ', with no reference strategy selected') +
-    (showMoneyIn ? '. Money you put in is drawn as a step beneath, ending at ' + usd2(netIn) +
+    (showMoneyIn ? '. ' + MONEY_IN_LABEL + ' are drawn as a step beneath, ending at a net ' + usd2(netIn) +
       ', so the space between the two is a gain of ' + usd2(D.endingValue - netIn) : '') + '.';
 }
 
@@ -1013,7 +1084,7 @@ function paintLegend() {
     .concat(chosen().map(c => ({
       name: c.s.label, color: c.slot.color, dash: c.slot.dash, dot: false, caution: !!c.s.caution
     })));
-  if (showMoneyIn) series.push({ name: 'Money you put in', area: true, dot: false, caution: false });
+  if (showMoneyIn) series.push({ name: MONEY_IN_LABEL, area: true, dot: false, caution: false });
 
   series.forEach(function (s) {
     const item = document.createElement('span');
@@ -1079,8 +1150,8 @@ function paintFoot() {
     D.observations.length + ' recorded balances across ' + n + ' months',
     'dots mark months with an actual balance — nothing between them is invented',
     c === 0 ? 'no reference strategy selected' : c + ' reference ' + (c === 1 ? 'strategy' : 'strategies') + ', same cash flows',
-    showMoneyIn ? 'money you put in stepped from ' + D.flows.length + ' recorded flows, net ' + usd(netIn)
-                : 'money you put in is switched off',
+    showMoneyIn ? 'contributions & withdrawals stepped from ' + D.flows.length + ' recorded flows, net ' + usd(netIn)
+                : 'contributions & withdrawals are switched off',
     'granularity: ' + D.dataQuality.granularity
   ];
   bits.forEach(function (t, i) {
@@ -1128,10 +1199,13 @@ function render() {
   const tiny = W < 460, narrow = W < 700, mid = W < 900;
   const H = narrow ? 340 : (mid ? 480 : 440);
   /* The gutter carries the end labels. With the picker beside the plot the
-     plot is narrower, so the gutter shrinks and the names shorten with it. */
+     plot is narrower, so the gutter shrinks and the names shorten with it. The
+     money line's own label is a phrase, not a word: it takes a little more
+     gutter when it is drawn, and it wraps onto two lines rather than being
+     given a third name nobody would recognise. */
   const M = {
     top: 28,
-    right: tiny ? 78 : (narrow ? 100 : (mid ? 152 : 200)),
+    right: tiny ? (showMoneyIn ? 92 : 78) : (narrow ? (showMoneyIn ? 114 : 100) : (mid ? 152 : 200)),
     bottom: 46,
     left: narrow ? 54 : 72
   };
@@ -1179,7 +1253,7 @@ function render() {
     }, yearOf(D.months[i])));
   }
 
-  /* money you put in — context, drawn first and beneath everything. A stone
+  /* contributions & withdrawals — context, drawn first and beneath everything. A stone
      wash from zero under a hairline, stepped: flat between the dates money
      moved, vertical on the dates it did. It takes none of the four
      categorical slots and carries no stroke pattern, so it cannot be read as
@@ -1232,11 +1306,12 @@ function render() {
     yv: c.s.endingValue, color: c.slot.color,
     name: tiny ? (TINY[c.s.id] || c.s.label) : mid ? (SHORT[c.s.id] || c.s.label) : c.s.label
   })).concat([{ yv: D.endingValue, color: YOU.color, name: narrow ? 'You' : 'Your portfolio' }])
-    .concat(showMoneyIn ? [{ yv: netIn, color: 'var(--floor-line)', name: tiny ? 'In' : 'Money in' }] : [])
+    .concat(showMoneyIn ? [{ yv: netIn, color: 'var(--floor-line)',
+      name: narrow ? ['Net', 'contributions'] : ['Contributions &', 'withdrawals'] }] : [])
     .map(l => ({ ...l, y0: y(l.yv) }));
 
   /* keep them apart without detaching them from their lines */
-  const blockH = tiny ? 30 : 34;
+  const blockH = (tiny ? 30 : 34) + (showMoneyIn ? (tiny ? 9 : 10) : 0);
   labels.sort((a, b) => a.y0 - b.y0);
   let ly = labels.map(l => l.y0);
   for (let i = 1; i < ly.length; i++) if (ly[i] - ly[i - 1] < blockH) ly[i] = ly[i - 1] + blockH;
@@ -1258,10 +1333,13 @@ function render() {
       class: 'end-value', x: tx, y: ly[i], fill: l.color, 'text-anchor': 'start',
       'font-size': tiny ? 14 : (labels.length > 2 ? 15 : 17)
     }, tiny ? '$' + nf(Math.round(l.yv / 1000)) + 'k' : usd(l.yv)));
-    svg.appendChild(S('text', {
-      class: 'end-name', x: tx, y: ly[i] + (tiny ? 13 : 14), fill: l.color,
-      'text-anchor': 'start', 'font-size': tiny ? 8 : 9
-    }, l.name));
+    const nameLines = Array.isArray(l.name) ? l.name : [l.name];
+    nameLines.forEach(function (t, k) {
+      svg.appendChild(S('text', {
+        class: 'end-name', x: tx, y: ly[i] + (tiny ? 13 : 14) + k * (tiny ? 9 : 10), fill: l.color,
+        'text-anchor': 'start', 'font-size': tiny ? 8 : 9
+      }, t));
+    });
   });
 
   /* crosshair layer — one dot per visible series */
@@ -1352,7 +1430,7 @@ function showAt(i) {
     youV === null ? (carried ? 'no balance recorded · last: ' + usd(carried.v) + ', ' + monthOf(D.months[carried.i]) : 'no balance recorded yet') : null);
 
   if (showMoneyIn) {
-    addRow(FLOOR, null, usd2(moneyIn[i]), 'Money you put in',
+    addRow(FLOOR, null, usd2(moneyIn[i]), MONEY_IN_LABEL,
       youV === null ? null : 'gain ' + signed(youV - moneyIn[i]), true);
   }
 
@@ -1431,7 +1509,7 @@ function showAt(i) {
     v.className = value === '—' ? 'tip-val is-empty' : 'tip-val';
     v.textContent = value;
     const nm = document.createElement('span');
-    nm.className = 'tip-name';
+    nm.className = area ? 'tip-name is-wrap' : 'tip-name';
     nm.textContent = name;
     row.appendChild(key); row.appendChild(v); row.appendChild(nm);
     tip.appendChild(row);
@@ -1453,7 +1531,7 @@ function buildTable() {
   body.textContent = '';
 
   const cols = [{ t: 'Month', cls: '' }, { t: 'Your value', cls: '' }];
-  if (showMoneyIn) cols.push({ t: 'Money in', cls: 'col-delta' });
+  if (showMoneyIn) cols.push({ t: MONEY_IN_SHORT, cls: 'col-delta' });
   picked.forEach(function (p) {
     cols.push({ t: p.s.label, cls: 'col-start' });
     cols.push({ t: 'vs you', cls: 'col-delta', aria: 'Difference between your portfolio and ' + p.s.label });
