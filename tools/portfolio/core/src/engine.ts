@@ -210,8 +210,12 @@ export interface AnalysisResult {
   gain: number;
   /**
    * Money already invested when the history opened, treated as such rather
-   * than as a contribution. Non-zero only when the input carries no flows at
-   * all, in which case it is the first balance. See `analyse`.
+   * than as a contribution.
+   *
+   * It is the first balance whenever that balance is dated before the first
+   * flow — which includes the case of no flows at all — and zero otherwise,
+   * because a balance dated after a contribution already contains it. See
+   * `analyse` for the full rule.
    */
   openingPosition: number;
   you: { xirr: number; annual: Record<string, number> };
@@ -280,11 +284,11 @@ export interface DataQuality {
   /**
    * ISO date of the first balance when it predates the first flow, else null.
    *
-   * A non-null value means the analysis is measuring a return on money it has
-   * no record of arriving: `netContributed` excludes it, so it lands in `gain`
-   * and in `capture.kept` as though it were performance. INTERACTION.md makes
-   * resolving this a question for the user, not a silent conversion, so this
-   * is the signal to ask it.
+   * A non-null value means the analysis treated that balance as opening
+   * capital rather than as gain — see `AnalysisResult.openingPosition`. The
+   * figures are right either way; what the user alone knows is whether the
+   * balance itself belongs there at all. INTERACTION.md asks the UI to raise
+   * it ("ask whether that's an opening balance"), and this is the signal to.
    */
   balanceBeforeFirstFlow: string | null;
   granularity: Granularity;
@@ -514,10 +518,12 @@ export function dataQualityWarnings(args: {
   balanceYears: number[];
   flowDates: Date[];
   /**
-   * ISO date of the balance being treated as an opening position, when the
-   * input carries no flows at all. Optional: omitting it is the ordinary case.
+   * ISO date of the balance being treated as opening capital, or null when
+   * there is none. Optional: omitting it is the ordinary case.
    */
   openingPositionDate?: string | null;
+  /** Whether the input carries any contributions or withdrawals at all. */
+  hasFlows?: boolean;
   /** ISO date of a first balance that predates the first flow, else null. */
   balanceBeforeFirstFlow?: string | null;
   /** ISO date of the first flow. Only read alongside the field above. */
@@ -646,10 +652,14 @@ export function dataQualityWarnings(args: {
       'Real transaction dates will improve accuracy.');
   }
 
-  // 5. Lump sum. Not a defect in the data and not a warning about accuracy —
-  //    it is a statement of the assumption the analysis is running on, which
-  //    the user never made explicitly and can only disagree with if told.
-  if (args.openingPositionDate) {
+  // 5 and 6. Opening capital. Neither is a warning about accuracy: the figures
+  //    are right in both cases. Each states an ASSUMPTION the engine made from
+  //    the row types — that a balance dated before any flow is money that was
+  //    already there — which the user never stated and can only disagree with
+  //    if told. Two wordings because the two shapes have different remedies.
+
+  // 5. No flows at all: the whole analysis rests on that one opening figure.
+  if (args.openingPositionDate && !args.hasFlows) {
     out.push(
       `No contributions or withdrawals were entered, so your first balance, dated ` +
       `${args.openingPositionDate}, is treated as money already invested on that date, and ` +
@@ -659,16 +669,17 @@ export function dataQualityWarnings(args: {
       `would have become.`);
   }
 
-  // 6. A balance dated before the first flow. This one IS a defect: until the
-  //    user answers the question, the opening amount is being counted as gain.
-  if (args.balanceBeforeFirstFlow) {
+  // 6. Flows exist, but a balance predates them. Silent on a zero opening
+  //    balance — an account opened and not yet funded assumes nothing and
+  //    changes nothing, so there is no assumption to disclose.
+  if (args.balanceBeforeFirstFlow && args.openingPositionDate && args.hasFlows) {
     out.push(
       `Your first balance is dated ${args.balanceBeforeFirstFlow}, before your first ` +
-      `contribution${args.firstFlowDate ? ` on ${args.firstFlowDate}` : ''}. If that balance ` +
-      `was money already invested, it is not currently counted as money you put in, so your ` +
-      `return and the kept-versus-given-up figures both treat it as gain and overstate them. ` +
-      `Entering it as a contribution on that date would correct them; leave it as it is only ` +
-      `if the account really was empty until then.`);
+      `contribution${args.firstFlowDate ? ` on ${args.firstFlowDate}` : ''}, so it is treated ` +
+      `as money already invested on that date rather than as gain you made, and each ` +
+      `reference strategy is given the same amount on the same day. If the account was ` +
+      `actually empty until then, that balance does not belong in the history and removing ` +
+      `it would change these figures.`);
   }
 
   return out;
@@ -1044,22 +1055,42 @@ export function analyse(
    * Capital that was already invested when the history opens, as opposed to
    * contributed during it.
    *
-   * INTERACTION.md: "No contributions — Fine, treat as a lump sum already
-   * invested at the first balance." That is exactly and only what this is. It
-   * is NOT a synthetic contribution: it never enters `grossContributed`,
-   * `netContributed` or `dataQuality.flowCount`, all of which continue to
-   * report what the user actually did, which is nothing. It enters the
-   * return maths, where a valuation-dated inflow is the correct and standard
-   * way to open a money-weighted calculation, and it enters the capture
-   * framing as invested capital rather than as gain.
+   * THE RULE: the first balance is opening capital when it is dated before the
+   * first flow. Otherwise zero.
    *
-   * Deliberately scoped to the no-flows case. A history that DOES have flows
-   * but opens with a balance dated before the first of them is a different
-   * INTERACTION.md row — "Ask whether that's an opening balance; offer to
-   * convert it" — an explicit user decision, so the engine flags it (see
-   * `dataQuality.balanceBeforeFirstFlow`) and does not convert it silently.
+   * The input format already distinguishes these unambiguously — `balance`
+   * means "the account was worth this", `contribution` means "I added this" —
+   * so there is nothing here to guess at. A balance dated before any flow can
+   * only be money that was already there. A balance dated after a contribution
+   * already contains that contribution, so counting both would double-count
+   * it, which is why the ordinary shape yields zero:
+   *
+   *   contribution first, balance later   -> 0 (the real fixture)
+   *   balances only, no flows at all      -> the first balance
+   *   first balance predates the first flow -> the first balance
+   *
+   * The no-flows case falls out of the same rule rather than being special:
+   * with no flows there is no first flow for the balance to follow.
+   *
+   * This is NOT a synthetic contribution. It never enters `grossContributed`,
+   * `netContributed` or `dataQuality.flowCount`, all of which keep reporting
+   * what the user actually put in. It enters the return maths, where a
+   * valuation-dated inflow is the correct and standard way to open a
+   * money-weighted calculation, and it enters the capture framing as invested
+   * capital rather than as gain.
+   *
+   * Zero and negative opening balances are excluded: an account opened but not
+   * yet funded has no capital to measure a return on, and nothing should be
+   * inferred from it either way.
+   *
+   * INTERACTION.md's "ask whether that's an opening balance; offer to convert
+   * it" remains good UI guidance, and `dataQuality.balanceBeforeFirstFlow`
+   * still carries the flag so the UI can ask. It is not a reason for the
+   * engine to return a wrong answer while it waits to be asked.
    */
-  const openingPosition = flows.length === 0 ? balances[0].value : 0;
+  const opensBeforeFirstFlow = flows.length === 0 || balances[0].date < flows[0].date;
+  const openingPosition =
+    opensBeforeFirstFlow && balances[0].value > 0 ? balances[0].value : 0;
 
   if (flows.length === 0 && openingPosition <= 0) {
     throw new AnalysisError(
@@ -1304,6 +1335,7 @@ export function analyse(
     flowDates: flows.map((f) => f.date),
     openingPositionDate:
       openingPosition > 0 ? balances[0].date.toISOString().slice(0, 10) : null,
+    hasFlows: flows.length > 0,
     balanceBeforeFirstFlow,
     firstFlowDate: flows.length ? flows[0].date.toISOString().slice(0, 10) : null,
   });

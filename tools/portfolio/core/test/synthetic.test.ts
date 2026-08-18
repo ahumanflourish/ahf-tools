@@ -561,66 +561,167 @@ describe('shape: one year of data', () => {
 // ════════════════════════════════════ 8. balance before the first contribution
 
 describe('shape: balance dated before the first contribution', () => {
-  // INTERACTION.md, error table: "Balance dated before first contribution —
-  // Ask whether that's an opening balance; offer to convert it." Both halves
-  // are the UI's, so the engine must not convert it silently — but before the
-  // fix it said nothing at all, and what it computed was badly wrong.
+  // THE RULE: the first balance is opening capital when it is dated before the
+  // first flow. The input format already says which is which — `balance` is
+  // "the account was worth this", `contribution` is "I added this" — so there
+  // is nothing to guess and no reason to wait for a user to be asked.
+  //
+  // INTERACTION.md's "ask whether that's an opening balance; offer to convert
+  // it" is UI guidance and still applies: the flag below is what lets the UI
+  // ask. It is not a licence for the engine to answer wrongly meanwhile, which
+  // is what it did — 50,000 of opening capital counted as gain, a 62%
+  // money-weighted return on 10,000 contributed, and an `outperformed`
+  // verdict built on money it never saw arrive.
   const rows: InputRow[] = [
     balance('2021-10-31', 50_000),
     contribution('2022-01-15', 10_000),
     balance('2026-07-31', 90_000),
   ];
 
-  it('flags the row so the UI can ask the question', () => {
+  it('treats the pre-flow balance as opening capital', () => {
     const r = run(rows);
-    expect(r.dataQuality.balanceBeforeFirstFlow).toBe('2021-10-31');
-    const w = r.dataQuality.warnings.find((x) => x.includes('before your first contribution'));
-    expect(w).toBeDefined();
-    expect(w).toContain('2021-10-31');
-    expect(w).toContain('2022-01-15');
-    expect(w).toContain('overstate');
-  });
-
-  it('does not convert it, and the warning is why that is safe', () => {
-    // Deliberately unconverted: only the user knows whether that balance was
-    // money already invested or an account that really was empty. The cost of
-    // not converting is that these figures are wrong until they answer — a
-    // 62% money-weighted return on 10,000 contributed, and an outperformance
-    // finding built on 50,000 the engine never saw arrive. Pinned so the
-    // severity of the unanswered question is on the record.
-    const r = run(rows);
+    expect(r.openingPosition).toBe(50_000);
+    // `netContributed` still reports what the user actually paid in during the
+    // period, which is 10,000. The opening 50,000 is capital, not a
+    // contribution, and conflating the two is what the separate field avoids.
     expect(r.netContributed).toBe(10_000);
-    expect(r.openingPosition).toBe(0);
-    expect(r.you.xirr).toBeGreaterThan(0.5);
-    expect(ids(r)).toContain('outperformed');
+    expect(r.gain).toBe(30_000); // 90,000 ending on 60,000 of capital
   });
 
-  it('reads correctly once the row is converted, which is the offer to make', () => {
+  it('no longer produces the 62% return it used to', () => {
+    const r = run(rows);
+    // Was 0.6221 — a return on 10,000 while ignoring the 50,000 underneath it.
+    expect(r.you.xirr).toBeCloseTo(0.0897759, 6);
+    expect(r.you.xirr).toBeLessThan(0.15);
+    // Independent: one in at 2021-10-31, one at 2022-01-15, 90,000 out. The
+    // closed form only exists for two flows, so this brackets rather than
+    // solves — 60,000 to 90,000 over the full span is the floor, and over the
+    // shorter span from the second contribution is the ceiling.
+    expect(r.you.xirr).toBeGreaterThan(twoFlowXirr('2021-10-31', '2026-07-31', 60_000, 90_000));
+    expect(r.you.xirr).toBeLessThan(twoFlowXirr('2022-01-15', '2026-07-31', 60_000, 90_000));
+  });
+
+  it('no longer claims an outperformance it never earned', () => {
+    const r = run(rows);
+    // Was `forgone` -73,762 and `pctKept` 12.82 — a "share kept" of 1282%,
+    // which should never have been renderable.
+    expect(r.capture.forgone).toBeGreaterThan(0);
+    expect(r.capture.forgone).toBeCloseTo(8_449.477, 3);
+    expect(r.capture.kept).toBe(30_000);
+    expect(r.capture.pctKept).toBeCloseTo(0.780245, 6);
+    expect(r.capture.pctKept).toBeLessThan(1);
+    expect(ids(r)).not.toContain('outperformed');
+  });
+
+  it('agrees with the same history entered as an explicit opening contribution', () => {
+    // The strongest form of the rule: whichever way the user describes the
+    // opening 50,000, the economics must come out the same. The two inputs
+    // differ only in what they CALL it, so only `netContributed` and
+    // `openingPosition` may differ — every derived figure must match exactly.
     const converted: InputRow[] = [
       contribution('2021-10-31', 50_000),
       balance('2021-10-31', 50_000),
       contribution('2022-01-15', 10_000),
       balance('2026-07-31', 90_000),
     ];
-    const r = run(converted);
-    expect(r.dataQuality.balanceBeforeFirstFlow).toBe(null);
-    expect(r.netContributed).toBe(60_000);
-    expect(r.gain).toBe(30_000);
-    expect(r.you.xirr).toBeLessThan(0.15);
-    // And the verdict inverts: against the reference this is an
-    // underperformance, not the outperformance the unconverted rows produced.
+    const a = run(rows);
+    const b = run(converted);
+
+    expect(b.openingPosition).toBe(0);
+    expect(b.netContributed).toBe(60_000);
+    expect(b.dataQuality.balanceBeforeFirstFlow).toBe(null);
+
+    // Everything downstream is identical, to the last bit.
+    expect(a.you.xirr).toBe(b.you.xirr);
+    expect(a.gain).toBe(b.gain);
+    expect(a.capture.available).toBe(b.capture.available);
+    expect(a.capture.kept).toBe(b.capture.kept);
+    expect(a.capture.forgone).toBe(b.capture.forgone);
+    expect(a.capture.pctKept).toBe(b.capture.pctKept);
+    expect(ref(a).endingValue).toBe(ref(b).endingValue);
+    expect(ids(a)).toEqual(ids(b));
+    // And the invested base is the same 60,000 by either route.
+    expect(a.netContributed + a.openingPosition).toBe(b.netContributed + b.openingPosition);
+  });
+
+  it('still flags the assumption so the UI can ask about it', () => {
+    // The engine now computes the right answer AND discloses the assumption.
+    // What the user alone knows is whether that balance belongs in the history
+    // at all — the engine cannot tell an opening position from a stray row.
+    const r = run(rows);
+    expect(r.dataQuality.balanceBeforeFirstFlow).toBe('2021-10-31');
+    const w = r.dataQuality.warnings.find((x) => x.includes('before your first contribution'));
+    expect(w).toBeDefined();
+    expect(w).toContain('2021-10-31');
+    expect(w).toContain('2022-01-15');
+    expect(w).toContain('treated as money already invested on that date rather than as gain');
+    expect(w).toContain('If the account was actually empty until then');
+    // The old copy told the user the figures were overstated. They are not.
+    expect(w).not.toContain('overstate');
+  });
+
+  it('opens on capital when the first flow is a WITHDRAWAL', () => {
+    // The rule is about the first flow of either kind, and it has to be:
+    // money cannot be withdrawn from an account that was never funded, so a
+    // balance preceding a withdrawal is unambiguously opening capital.
+    const r = run([
+      balance('2021-10-31', 50_000),
+      withdrawal('2022-01-15', 5_000),
+      balance('2026-07-31', 70_000),
+    ]);
+    expect(r.openingPosition).toBe(50_000);
+    expect(r.grossWithdrawn).toBe(5_000);
+    expect(r.netContributed).toBe(-5_000);
+    // 70,000 ending, 45,000 of capital left in after the withdrawal.
+    expect(r.gain).toBe(25_000);
+    expect(r.you.xirr).toBeCloseTo(0.0969768, 6);
     expect(ids(r)).not.toContain('outperformed');
+  });
+
+  it('is not tripped by a first balance of exactly zero', () => {
+    // An account opened but not yet funded. There is no capital, so there is
+    // no opening position, no assumption to disclose, and nothing to warn
+    // about — but the analysis must still run normally.
+    const r = run([
+      balance('2021-10-31', 0),
+      contribution('2022-01-15', 10_000),
+      balance('2026-07-31', 15_000),
+    ]);
+    expect(r.openingPosition).toBe(0);
+    expect(r.netContributed).toBe(10_000);
+    expect(r.gain).toBe(5_000);
+    expect(r.you.xirr).toBeCloseTo(0.0933660, 6);
+    // The factual flag still describes the rows honestly...
+    expect(r.dataQuality.balanceBeforeFirstFlow).toBe('2021-10-31');
+    // ...but nothing was assumed, so nothing is disclosed.
+    expect(r.dataQuality.warnings.some((w) => w.includes('first balance'))).toBe(false);
+  });
+
+  it('still refuses only where there is genuinely no capital', () => {
+    // `no-invested-capital` is for no flows AND no opening balance. A zero
+    // opening balance with flows is fine (above); zero with nothing else is
+    // not, because there is no capital for a return to be a return on.
+    expect(() => run([balance('2021-10-31', 0), balance('2026-07-31', 15_000)])).toThrow();
+    expect(() => run([
+      balance('2021-10-31', 0),
+      contribution('2022-01-15', 10_000),
+      balance('2026-07-31', 15_000),
+    ])).not.toThrow();
   });
 
   it('does not flag a first balance that merely shares its date with the flow', () => {
     // The fixture's own shape is contribution-then-balance; this guards the
-    // boundary so the warning cannot start firing on ordinary inputs.
+    // boundary so the rule cannot start engaging on ordinary inputs. Same-day
+    // means the balance already contains the contribution, so counting both
+    // would double-count it.
     const r = run([
       contribution('2021-10-31', 50_000),
       balance('2021-10-31', 50_000),
       balance('2026-07-31', 90_000),
     ]);
     expect(r.dataQuality.balanceBeforeFirstFlow).toBe(null);
+    expect(r.openingPosition).toBe(0);
+    expect(r.netContributed).toBe(50_000);
   });
 });
 
@@ -708,6 +809,16 @@ describe('invariants across every synthetic shape', () => {
     const r = analyse(
       { ...fixture.input, holdings: fixture.holdings },
       benchmarks, strategies, referenceId, NOW);
+    // And WHY it is inert: the first row is a contribution, and the first
+    // balance is dated after it, so that balance already contains the
+    // contribution. Counting both would double-count it.
+    const first = fixture.input.rows[0];
+    const firstBalance = fixture.input.rows.find((x) => x.type === 'balance')!;
+    expect(first.type).toBe('contribution');
+    expect(first.date).toBe('2021-10-12');
+    expect(firstBalance.date).toBe('2021-10-31');
+    expect(firstBalance.date > first.date).toBe(true);
+
     expect(r.openingPosition).toBe(0);
     expect(r.dataQuality.balanceBeforeFirstFlow).toBe(null);
     // And the two figures the brief pins, to full precision.
