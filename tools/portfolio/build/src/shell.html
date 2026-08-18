@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portfolio Core — offline check</title>
+<!-- Inline data: URI so the browser never asks the network for /favicon.ico.
+     This file must issue zero requests of any kind. -->
+<link rel="icon" href="data:,">
+<style>
+  /* System font stack only. Web fonts, stylesheet includes and asset
+     references are all external references, which this target forbids —
+     the build's static scan fails if any of them appear here. */
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0; padding: 2rem 1.5rem;
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    max-width: 46rem;
+  }
+  h1 { font-size: 1.15rem; margin: 0 0 .25rem; letter-spacing: .01em; }
+  p.sub { margin: 0 0 1.5rem; opacity: .7; }
+  .headline { font-size: 2rem; font-variant-numeric: tabular-nums; margin: 0 0 .1rem; }
+  .label { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; opacity: .6; }
+  table { border-collapse: collapse; width: 100%; margin-top: 1.5rem; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: .35rem .6rem .35rem 0; border-bottom: 1px solid rgba(128,128,128,.28); }
+  th { font-weight: 600; font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; opacity: .6; }
+  td.num, th.num { text-align: right; padding-right: 0; }
+  .err { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+</style>
+</head>
+<body>
+<h1>Portfolio Core — offline check</h1>
+<p class="sub">Single file. No network. The engine and its benchmark, strategy and fixture data are inlined below.</p>
+<div id="app"><span class="label">status</span><div class="headline">running…</div></div>
+
+<script>
+/*__BUNDLE__*/
+</script>
+
+<script>
+(function () {
+  // Convenience aliases so a test harness (or a console) can call the engine
+  // directly: `analyse(input, benchmarks, strategies, referenceId)`.
+  window.analyse = PortfolioCore.analyse;
+  window.benchmarks = PortfolioCore.benchmarks;
+  window.strategies = PortfolioCore.strategies;
+  window.referenceId = PortfolioCore.referenceId;
+  window.fixture = PortfolioCore.fixture;
+
+  var app = document.getElementById('app');
+  var money = function (n) {
+    return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  };
+  var pct = function (n) { return (n * 100).toFixed(2) + '%'; };
+
+  try {
+    var r = window.analyse(
+      PortfolioCore.fixture.input,
+      window.benchmarks,
+      window.strategies,
+      window.referenceId
+    );
+    window.__PORTFOLIO_RESULT__ = r;
+
+    var rows = r.strategies.map(function (s) {
+      return '<tr><td>' + s.id + '</td><td class="num">' + money(s.endingValue) +
+             '</td><td class="num">' + pct(s.xirr) + '</td></tr>';
+    }).join('');
+
+    app.innerHTML =
+      '<span class="label">ending value</span>' +
+      '<div class="headline">' + money(r.endingValue) + '</div>' +
+      '<div class="label">' + PortfolioCore.fixture.name + ' · your XIRR ' + pct(r.you.xirr) +
+      ' · kept ' + pct(r.capture.pctKept) + ' of available</div>' +
+      '<table><thead><tr><th>strategy</th><th class="num">ending value</th>' +
+      '<th class="num">xirr</th></tr></thead><tbody>' + rows + '</tbody></table>';
+
+    window.__PORTFOLIO_READY__ = true;
+  } catch (e) {
+    window.__PORTFOLIO_ERROR__ = String((e && e.stack) || e);
+    app.innerHTML = '<span class="label">failed</span><div class="err">' +
+      window.__PORTFOLIO_ERROR__.replace(/[<&]/g, function (c) {
+        return c === '<' ? '&lt;' : '&amp;';
+      }) + '</div>';
+    window.__PORTFOLIO_READY__ = true;
+  }
+})();
+</script>
+</body>
+</html>

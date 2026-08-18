@@ -9,6 +9,7 @@
     "./data/*": "./src/data/*"
   },
   "scripts": {
+    "build": "node ../build/build.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

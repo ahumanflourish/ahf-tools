@@ -1,0 +1,20 @@
+{
+  // Declaration emit for the ESM library target. Extends the core's own
+  // compiler settings so the types shipped are the types the core typechecks
+  // against — nothing is loosened here. Only emit-related options and the file
+  // set are overridden.
+  "extends": "../core/tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": true,
+    // The core config pulls in vitest's globals for its test suite; the build
+    // package has no vitest, and declaration emit does not need it.
+    "types": [],
+    "rootDir": "../core/src",
+    "outDir": "./dist/esm"
+  },
+  // Library surface only. The test suite is not part of the published types.
+  "include": ["../core/src/**/*.ts"]
+}
