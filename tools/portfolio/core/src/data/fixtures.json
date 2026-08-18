@@ -1,0 +1,317 @@
+{
+ "name": "reference-case-2021-2026",
+ "description": "Real portfolio, Oct 2021 - Jul 2026. Every expected value below was independently verified during the original analysis: statement years reconcile to the cent, XIRR re-derived by hand-rolled bisection, benchmark paths reproduced by two independent accumulation methods. If a refactor changes these, it is a regression.",
+ "input": {
+  "rows": [
+   {
+    "date": "2021-10-12",
+    "type": "contribution",
+    "amount": 10000.0
+   },
+   {
+    "date": "2021-10-31",
+    "type": "balance",
+    "amount": 10014.74
+   },
+   {
+    "date": "2021-11-15",
+    "type": "contribution",
+    "amount": 6000.0
+   },
+   {
+    "date": "2021-11-30",
+    "type": "balance",
+    "amount": 15879.92
+   },
+   {
+    "date": "2021-12-31",
+    "type": "balance",
+    "amount": 16500.81
+   },
+   {
+    "date": "2022-01-31",
+    "type": "balance",
+    "amount": 15596.22
+   },
+   {
+    "date": "2022-09-30",
+    "type": "balance",
+    "amount": 12359.97
+   },
+   {
+    "date": "2022-11-30",
+    "type": "balance",
+    "amount": 14081.32
+   },
+   {
+    "date": "2022-12-31",
+    "type": "balance",
+    "amount": 13412.47
+   },
+   {
+    "date": "2023-01-15",
+    "type": "contribution",
+    "amount": 6000.0
+   },
+   {
+    "date": "2023-01-15",
+    "type": "withdrawal",
+    "amount": 3000.0
+   },
+   {
+    "date": "2023-01-31",
+    "type": "balance",
+    "amount": 17664.31
+   },
+   {
+    "date": "2023-09-30",
+    "type": "balance",
+    "amount": 17625.17
+   },
+   {
+    "date": "2023-11-30",
+    "type": "balance",
+    "amount": 18475.94
+   },
+   {
+    "date": "2023-12-31",
+    "type": "balance",
+    "amount": 19602.4
+   },
+   {
+    "date": "2024-03-31",
+    "type": "balance",
+    "amount": 21061.89
+   },
+   {
+    "date": "2024-04-15",
+    "type": "contribution",
+    "amount": 6500.0
+   },
+   {
+    "date": "2024-04-30",
+    "type": "balance",
+    "amount": 26566.43
+   },
+   {
+    "date": "2024-05-31",
+    "type": "balance",
+    "amount": 27628.75
+   },
+   {
+    "date": "2024-09-30",
+    "type": "balance",
+    "amount": 29788.35
+   },
+   {
+    "date": "2024-11-15",
+    "type": "contribution",
+    "amount": 875.0
+   },
+   {
+    "date": "2024-11-30",
+    "type": "balance",
+    "amount": 31754.24
+   },
+   {
+    "date": "2024-12-15",
+    "type": "contribution",
+    "amount": 1750.0
+   },
+   {
+    "date": "2024-12-31",
+    "type": "balance",
+    "amount": 32235.32
+   },
+   {
+    "date": "2025-01-15",
+    "type": "contribution",
+    "amount": 3500.0
+   },
+   {
+    "date": "2025-01-15",
+    "type": "withdrawal",
+    "amount": 875.0
+   },
+   {
+    "date": "2025-01-31",
+    "type": "balance",
+    "amount": 35835.11
+   },
+   {
+    "date": "2025-02-15",
+    "type": "contribution",
+    "amount": 1750.0
+   },
+   {
+    "date": "2025-02-28",
+    "type": "balance",
+    "amount": 37103.49
+   },
+   {
+    "date": "2025-03-15",
+    "type": "contribution",
+    "amount": 7000.0
+   },
+   {
+    "date": "2025-03-31",
+    "type": "balance",
+    "amount": 42405.47
+   },
+   {
+    "date": "2025-09-30",
+    "type": "balance",
+    "amount": 49438.47
+   },
+   {
+    "date": "2025-11-30",
+    "type": "balance",
+    "amount": 49986.41
+   },
+   {
+    "date": "2025-12-31",
+    "type": "balance",
+    "amount": 50088.67
+   },
+   {
+    "date": "2026-02-15",
+    "type": "contribution",
+    "amount": 7500.0
+   },
+   {
+    "date": "2026-02-15",
+    "type": "withdrawal",
+    "amount": 7500.0
+   },
+   {
+    "date": "2026-02-28",
+    "type": "balance",
+    "amount": 51915.09
+   },
+   {
+    "date": "2026-03-31",
+    "type": "balance",
+    "amount": 50134.52
+   },
+   {
+    "date": "2026-06-30",
+    "type": "balance",
+    "amount": 53969.84
+   },
+   {
+    "date": "2026-07-31",
+    "type": "balance",
+    "amount": 53690.25
+   }
+  ],
+  "feePct": 0.0085,
+  "currentAge": 31,
+  "statedTargetYear": 2043
+ },
+ "holdings": {
+  "asOf": "2023-08-31",
+  "positions": [
+   {
+    "ticker": "SPYG",
+    "value": 3625.0,
+    "assetClass": "us_equity",
+    "sizeBucket": "large"
+   },
+   {
+    "ticker": "SPYV",
+    "value": 3434.13,
+    "assetClass": "us_equity",
+    "sizeBucket": "large"
+   },
+   {
+    "ticker": "VB",
+    "value": 3417.51,
+    "assetClass": "us_equity",
+    "sizeBucket": "small"
+   },
+   {
+    "ticker": "VO",
+    "value": 3295.35,
+    "assetClass": "us_equity",
+    "sizeBucket": "mid"
+   },
+   {
+    "ticker": "IEFA",
+    "value": 2877.13,
+    "assetClass": "intl_equity"
+   },
+   {
+    "ticker": "IEMG",
+    "value": 1275.56,
+    "assetClass": "intl_equity"
+   },
+   {
+    "ticker": "CASH",
+    "value": 509.93,
+    "assetClass": "cash"
+   }
+  ]
+ },
+ "expected": {
+  "netContributed": 39500.0,
+  "endingValue": 53690.25,
+  "gain": 14190.25,
+  "yourXirr": {
+   "value": 0.100544,
+   "tolerance": 0.0002
+  },
+  "strategies": {
+   "GLOBAL_EQUITY": {
+    "endingValue": 60328.4,
+    "xirr": 0.139554,
+    "tolerance": 50
+   },
+   "TARGET_2060": {
+    "endingValue": 58459.31,
+    "xirr": 0.128999,
+    "tolerance": 50
+   },
+   "US_500": {
+    "endingValue": 62402.77,
+    "xirr": 0.150994,
+    "tolerance": 50
+   }
+  },
+  "capture": {
+   "available": 20828.4,
+   "kept": 14190.25,
+   "forgone": 6638.15,
+   "pctKept": 0.6812,
+   "pctForgone": 0.3188,
+   "tolerance": 0.002
+  },
+  "annual": {
+   "2022": -0.1872,
+   "2023": 0.1957,
+   "2024": 0.1437,
+   "2025": 0.1547,
+   "tolerance": 0.0015
+  },
+  "flowFreeWindows": [
+   {
+    "start": "2025-03-31",
+    "end": "2025-12-31",
+    "minMonths": 9,
+    "yourReturn": 0.18118,
+    "tolerance": 0.001
+   }
+  ],
+  "findings": [
+   "target-year-mismatch",
+   "capture-asymmetry",
+   "fee-minority",
+   "regional-tilt",
+   "size-tilt"
+  ]
+ },
+ "notes": [
+  "feePct 0.0085 is the stated advisory fee. Statement balances are used AS REPORTED - the engine does not deduct it from the user's own path.",
+  "Contribution dates marked inferred in the original analysis were reconstructed by differencing quarterly totals. Sensitivity-tested across start/mid/end-of-month: the gap moved only between 3.73 and 4.19 percentage points.",
+  "The 2026 +7500/-7500 pair is an internal transfer between two accounts, double-counted by the statement. It nets to zero and does not affect any figure."
+ ]
+}

@@ -1,0 +1,81 @@
+{
+ "strategies": [
+  {
+   "id": "GLOBAL_EQUITY",
+   "label": "Global stock market",
+   "weights": {
+    "GLOBAL_EQUITY": 1.0
+   },
+   "expenseRatio": 0,
+   "rebalance": "never",
+   "default": true,
+   "explainer": "Every listed company in the world, weighted by size. The simplest possible 'do nothing' portfolio and the fairest yardstick for a stock-heavy strategy."
+  },
+  {
+   "id": "GLOBAL_8020",
+   "label": "Global 80/20",
+   "weights": {
+    "GLOBAL_EQUITY": 0.8,
+    "BOND_TOTAL": 0.2
+   },
+   "expenseRatio": 0,
+   "rebalance": "annual",
+   "explainer": "Global stocks with a fifth in bonds. A common setting for someone decades from retirement who still wants some cushion."
+  },
+  {
+   "id": "GLOBAL_6040",
+   "label": "Global 60/40",
+   "weights": {
+    "GLOBAL_EQUITY": 0.6,
+    "BOND_TOTAL": 0.4
+   },
+   "expenseRatio": 0,
+   "rebalance": "annual",
+   "explainer": "The classic balanced portfolio. Lower highs and shallower lows."
+  },
+  {
+   "id": "TARGET_2060",
+   "label": "Target-date 2060 fund",
+   "weights": {
+    "TARGET_2060": 1.0
+   },
+   "expenseRatio": 0,
+   "rebalance": "never",
+   "explainer": "One fund that holds global stocks and bonds and gets more conservative as you age. What most 401k plans use as a default.",
+   "requiresAfter": 2012
+  },
+  {
+   "id": "US_TOTAL",
+   "label": "US stock market",
+   "weights": {
+    "US_TOTAL": 1.0
+   },
+   "expenseRatio": 0,
+   "rebalance": "never",
+   "explainer": "Every US-listed company, weighted by size.",
+   "caution": "US stocks beat global stocks over the last decade. Nobody knew that in advance, and the reverse has happened in other decades. Treat this as context, not as a standard your strategy should have met."
+  },
+  {
+   "id": "US_500",
+   "label": "S&P 500",
+   "weights": {
+    "US_500": 1.0
+   },
+   "expenseRatio": 0,
+   "rebalance": "never",
+   "explainer": "The 500 largest US companies.",
+   "caution": "This is the single most hindsight-prone comparison available. US large caps had an exceptional run; picking them in advance would have been a concentrated bet, not prudence. Shown for context only."
+  },
+  {
+   "id": "ALL_BONDS",
+   "label": "All bonds",
+   "weights": {
+    "BOND_TOTAL": 1.0
+   },
+   "expenseRatio": 0,
+   "rebalance": "never",
+   "explainer": "The whole US investment-grade bond market. Useful as a floor reference."
+  }
+ ],
+ "defaultReference": "GLOBAL_EQUITY"
+}
