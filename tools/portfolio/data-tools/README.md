@@ -90,6 +90,15 @@ its parts. This is the *only* internal ground truth available for
 is the check that will govern the constructed pre-2008 `GLOBAL_EQUITY` series
 SPEC requires.
 
+The weight is refitted on a rolling 18-month window rather than pooled across
+the whole overlap, because the thing being fitted moves: the US share of world
+equity market cap ran from 37% in 2010 to 63% in 2026. A single pooled weight
+reported that drift as error and raised ERRORs on four years of untouched
+data. `src/composite.mjs` carries the derivation, including why a per-year
+refit — the obvious alternative — would have traded that false positive for a
+false negative on exactly the price-only degradation this check exists to
+catch. `python3 composite_drift.py` prints the year-by-year fit.
+
 **5. Two-source diff** — every month where two candidate files disagree, with
 magnitudes, plus a compounded per-year view. If the disagreements point
 consistently one way it says so and computes the implied annual basis

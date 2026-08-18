@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { compound, findDuplicateKeys, loadCandidate, parseYtdMarker } from '../src/load.mjs';
 import { DEFAULT_THRESHOLDS, STATUS, detectPriceOnly, noiseFloor, reconcileSeries, signTestP } from '../src/reconcile.mjs';
 import { checkStructure, checkStrategyReferences } from '../src/structure.mjs';
-import { checkComposite, checkComposites, fitWeight, COMPOSITES } from '../src/composite.mjs';
+import { checkComposite, checkComposites, fitWeight, rollingWeights, COMPOSITES, COMPOSITE_THRESHOLDS } from '../src/composite.mjs';
 import { diffSeries } from '../src/diff.mjs';
 import { runCheck } from '../verify.mjs';
 import {
@@ -62,20 +62,36 @@ describe('shipped benchmarks.json', () => {
 
   test('every core series reconciles inside the empirical floor', () => {
     const c = good();
-    for (const id of ['US_500', 'US_TOTAL', 'INTL_TOTAL', 'BOND_TOTAL']) {
+    // Comparable-year counts, which double as a coverage tripwire: the v1.1.0
+    // backfill took three series to 1996-01 and INTL_TOTAL only to 2004-01,
+    // for the reason `meta.notes` gives under "WHY INTL_TOTAL STOPS AT 2004".
+    // These were all 5 when the monthly data began in 2021-10.
+    const expected = { US_500: 31, US_TOTAL: 31, INTL_TOTAL: 23, BOND_TOTAL: 31 };
+    for (const [id, n] of Object.entries(expected)) {
       const r = reconcile(c, id);
       assert.equal(r.status, STATUS.OK, `${id} is ${r.status}`);
-      assert.equal(r.stats.n, 5, `${id} should have 5 comparable years`);
+      assert.equal(r.stats.n, n, `${id} should have ${n} comparable years`);
       assert.ok(r.stats.maxAbs < DEFAULT_THRESHOLDS.warnBp, `${id} max ${r.stats.maxAbs}bp`);
     }
   });
 
-  test('the partial leading year is skipped, not failed', () => {
-    const r = reconcile(good(), 'US_500');
-    const y2021 = r.rows.find((x) => x.year === 2021);
-    assert.equal(y2021.status, STATUS.SKIP);
-    assert.match(y2021.note, /window starts 2021-10/);
-    assert.equal(y2021.diffBp, null);
+  test('a partial leading year is skipped, not failed', () => {
+    // No shipped series has one any more — the backfill starts every series
+    // on a January, so 2021 is a complete year for all four and the code path
+    // has nothing real to run on. It is still the path that stops a
+    // three-month stub being scored against a twelve-month annual figure, so
+    // it is exercised here on a candidate truncated to start mid-year.
+    const c = clone(good());
+    for (const k of Object.keys(c.monthly.US_500)) {
+      if (k < '1996-10') delete c.monthly.US_500[k];
+    }
+    const r = reconcile(c, 'US_500');
+    const y1996 = r.rows.find((x) => x.year === 1996);
+    assert.equal(y1996.status, STATUS.SKIP);
+    assert.match(y1996.note, /window starts 1996-10/);
+    assert.equal(y1996.diffBp, null);
+    // and the years behind it are unaffected
+    assert.equal(r.rows.find((x) => x.year === 1997).status, STATUS.OK);
   });
 
   test('the YTD year IS compared, against the seven months it covers', () => {
@@ -86,11 +102,36 @@ describe('shipped benchmarks.json', () => {
     assert.equal(y2026.status, STATUS.OK);
   });
 
-  test('the pooled noise floor is small and one-sided-positive', () => {
+  test('the pooled noise floor is small, and now has two populations in it', () => {
     const nf = noiseFloor(good());
-    assert.equal(nf.n, 20);
+    assert.equal(nf.n, 116, 'four series over 1996-2026, INTL_TOTAL from 2004');
     assert.ok(nf.maxAbs < 50, `max |${nf.maxAbs}|bp`);
     assert.ok(nf.mean > 0 && nf.mean < 25, `mean ${nf.mean}bp`);
+
+    // The pooled mean fell from +12bp to +2bp with the backfill, and that is
+    // a fact about BASIS, not about accuracy. NOISE-FLOOR.md term (2): the
+    // 2021-10-onward monthly series are ETFs measured against mutual-fund
+    // annual figures, so they compound slightly high; the backfill uses the
+    // same mutual-fund share classes as the annual series, so that term is
+    // absent from it and its residuals sit on zero. Pooling the two and
+    // taking |mean| + 4sd — which is what `noise-floor` suggests — averages
+    // across two populations. Asserted so that nobody reads the smaller
+    // pooled mean as the tolerance having earned a tightening.
+    const c = good();
+    const era = (from, to) => {
+      const out = [];
+      for (const id of ['US_500', 'US_TOTAL', 'INTL_TOTAL', 'BOND_TOTAL']) {
+        for (const row of reconcile(c, id).rows) {
+          if (row.diffBp != null && row.year >= from && row.year <= to) out.push(row.diffBp);
+        }
+      }
+      return out;
+    };
+    const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const backfill = era(1996, 2020);
+    const etf = era(2022, 2026);
+    assert.ok(Math.abs(mean(backfill)) < 3, `backfill era mean ${mean(backfill).toFixed(1)}bp`);
+    assert.ok(mean(etf) > 8, `ETF era mean ${mean(etf).toFixed(1)}bp`);
   });
 
   test('strategies.json only references series that exist', () => {
@@ -297,13 +338,42 @@ describe('structural integrity', () => {
 // -------------------------------------------------------- 3. COMPOSITES ----
 
 describe('cross-series composites', () => {
-  test('GLOBAL_EQUITY resolves to a plausible market weight', () => {
+  test('GLOBAL_EQUITY resolves to a plausible market weight, and to a MOVING one', () => {
     const r = checkComposite(good(), COMPOSITES[0]);
     assert.equal(r.status, 'OK');
-    assert.ok(r.impliedWeight > 0.55 && r.impliedWeight < 0.70, `w=${r.impliedWeight}`);
-    assert.ok(r.rmsBp < 15, `rms ${r.rmsBp}bp`);
+    assert.equal(r.months, 199);
+    // The pooled weight is now a time-average over sixteen years, so it says
+    // less than it used to; it is kept for the identity check and nothing
+    // else. The rolling weights are the real measurement.
+    assert.ok(r.impliedWeight > 0.45 && r.impliedWeight < 0.65, `pooled w=${r.impliedWeight}`);
+    assert.ok(r.rmsBp < 20, `rms ${r.rmsBp}bp`);
+
+    // The US share of world market cap really did run from about 37% to about
+    // 63% over 2010-2026. A fit that does not show that is not tracking it.
+    assert.ok(r.weightFirst > 0.34 && r.weightFirst < 0.40, `first ${r.weightFirst}`);
+    assert.ok(r.weightLast > 0.59 && r.weightLast < 0.66, `last ${r.weightLast}`);
     // the US share should drift upward over this window, as it did
     assert.ok(r.years.at(-1).impliedWeight > r.years[0].impliedWeight);
+
+    // The point of the whole change: no year is now called an error. Under a
+    // single pooled weight 2010, 2013, 2024 and 2025 were ERRORs, on data
+    // nobody had touched.
+    assert.deepEqual(r.findings, []);
+    assert.ok(r.years.every((y) => Math.abs(y.diffBp) < 50), 'worst annual disagreement');
+  });
+
+  test('a pooled fit is what a drifting weight breaks — the regression this replaced', () => {
+    // Pin the failure mode itself, so the rolling fit cannot be quietly
+    // reverted to a pooled one without a test saying what that costs.
+    const c = good();
+    const rolled = checkComposite(c, COMPOSITES[0]);
+    const pooled = checkComposite(c, COMPOSITES[0], { windowMonths: 1e6 });
+    assert.ok(pooled.rmsBp > 24 && rolled.rmsBp < 18, `${pooled.rmsBp} vs ${rolled.rmsBp}`);
+    const worst = (r) => Math.max(...r.years.map((y) => Math.abs(y.diffBp)));
+    assert.ok(worst(pooled) > 150, `pooled worst year ${worst(pooled)}bp`);
+    assert.ok(worst(rolled) < 50, `rolling worst year ${worst(rolled)}bp`);
+    assert.equal(pooled.status, 'FAIL');
+    assert.equal(rolled.status, 'OK');
   });
 
   test('TARGET_2060 resolves to roughly 90% equity', () => {
@@ -331,10 +401,26 @@ describe('cross-series composites', () => {
 
     const r = checkComposite(c, COMPOSITES[0]);
     assert.equal(r.status, 'FAIL');
-    assert.ok(r.years.filter((y) => y.months === 12).every((y) => y.diffBp < -150),
-      'every full year should sit ~220bp below its parts');
-    assert.ok(r.findings.some((f) => f.code === 'COMPOSITE_YEAR'));
+    // EVERY year, including the partial one, must be over the fail floor —
+    // and it is the rolling fit that makes that true. A pooled fit let 2024
+    // through at -136bp against a 120bp floor, and a per-year refit lets 2011
+    // (-86bp) and 2014 (-113bp) through, because a weight fitted on the same
+    // twelve months absorbs the drag it is supposed to expose.
+    assert.equal(r.years.length, 17);
+    for (const y of r.years) {
+      assert.ok(y.diffBp < -COMPOSITE_THRESHOLDS.annualBp,
+        `${y.year} only ${y.diffBp.toFixed(0)}bp below its parts`);
+    }
+    assert.ok(r.years.filter((y) => y.months === 12).every((y) => y.diffBp < -125),
+      'every full year should sit well below its parts');
+    assert.equal(r.findings.filter((f) => f.code === 'COMPOSITE_YEAR').length, 17);
     assert.equal(runCheck(c).verdict, STATUS.FAIL);
+
+    // A pooled fit is strictly worse at this, which is the false negative the
+    // false-positive fix must not have bought.
+    const pooled = checkComposite(c, COMPOSITES[0], { windowMonths: 1e6 });
+    assert.ok(pooled.years.some((y) => y.diffBp > -COMPOSITE_THRESHOLDS.annualBp - 40),
+      'a pooled fit should miss at least one year');
   });
 
   test('fitWeight recovers a weight it was given', () => {
@@ -345,6 +431,49 @@ describe('cross-series composites', () => {
       pairs.push({ a, b, t: 0.63 * a + 0.37 * b });
     }
     assert.ok(Math.abs(fitWeight(pairs) - 0.63) < 1e-9);
+  });
+
+  test('rollingWeights recovers a weight that MOVES, which fitWeight cannot', () => {
+    // A synthetic 199-month series whose true weight ramps 0.37 -> 0.63, the
+    // shape the real US market share has. The pooled fit can only return one
+    // number and lands in the middle; the rolling fit tracks the ramp.
+    const pairs = [];
+    const n = 199;
+    for (let i = 0; i < n; i++) {
+      const w = 0.37 + (0.63 - 0.37) * (i / (n - 1));
+      const a = Math.sin(i) * 4;
+      const b = Math.cos(i * 0.7) * 3;
+      pairs.push({ key: String(i).padStart(4, '0'), a, b, t: w * a + (1 - w) * b });
+    }
+    const pooled = fitWeight(pairs);
+    assert.ok(Math.abs(pooled - 0.50) < 0.05, `pooled ${pooled}`);
+
+    const local = rollingWeights(pairs, 18);
+    assert.equal(local.length, n);
+    // Each local fit is within a couple of points of the truth at that month —
+    // it cannot be exact, because the weight moves inside the window too.
+    for (let i = 0; i < n; i++) {
+      const truth = 0.37 + (0.63 - 0.37) * (i / (n - 1));
+      assert.ok(Math.abs(local[i] - truth) < 0.03, `month ${i}: ${local[i]} vs ${truth}`);
+    }
+    // Residuals collapse: pooled leaves the whole ramp in them.
+    const resid = (ws) => Math.sqrt(pairs.reduce((acc, p, i) => {
+      const w = typeof ws === 'number' ? ws : ws[i];
+      return acc + ((p.t - (w * p.a + (1 - w) * p.b)) * 100) ** 2;
+    }, 0) / n);
+    assert.ok(resid(local) < resid(pooled) / 10, `${resid(local)} vs ${resid(pooled)}`);
+  });
+
+  test('a window longer than the data degenerates to the pooled fit', () => {
+    const pairs = [];
+    for (let i = 0; i < 30; i++) {
+      const a = Math.sin(i) * 3;
+      const b = Math.cos(i) * 2;
+      pairs.push({ key: String(i), a, b, t: 0.58 * a + 0.42 * b });
+    }
+    for (const w of rollingWeights(pairs, 1000)) {
+      assert.ok(Math.abs(w - fitWeight(pairs)) < 1e-12);
+    }
   });
 });
 

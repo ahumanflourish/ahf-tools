@@ -86,6 +86,73 @@ does not establish that a 1998 residual will behave the same way, and if the
 backwards extension comes from a different provider the floor should be
 re-measured over the new years rather than assumed.
 
+## Re-measured after the v1.1.0 backfill — and why the thresholds did NOT move
+
+The paragraph above says to re-run `noise-floor` on the extended file. Done:
+
+```
+  US_TOTAL     n=31  median   0.2  mean  0.9  sd  6.9  max|23.5|
+  INTL_TOTAL   n=23  median  -0.8  mean  1.8  sd 11.5  max|43.9|
+  BOND_TOTAL   n=31  median   2.4  mean  3.6  sd  6.2  max|24.2|
+  US_500       n=31  median   0.1  mean  2.0  sd  6.1  max|21.6|
+
+  POOLED       n=116  median 0.3  mean 2.1  sd 7.6  p95|21.2|  max|43.9|
+
+  suggested warn threshold: 40bp        shipped: 60bp
+  suggested fail threshold: 80bp        shipped: 120bp
+```
+
+The sample went from 20 series-years to 116 and the pooled mean fell from
++12bp to +2bp, so the tool's own `|mean| + 4sd` rule now suggests 40/80. **The
+shipped defaults stay at 60/120.** Three reasons, in order of weight.
+
+**1. The pooled sample is now two populations, and the suggestion averages
+across them.** Term (2) above — the ETF-vs-mutual-fund share-class gap — is
+the reason the old mean was +12bp. The backfill does not have it:
+`meta.notes` records that the pre-2021-10 months use the *same* mutual-fund
+share classes the annual series was built from, so its residuals are centred
+on zero by construction. The two eras measured separately:
+
+| era | basis of monthly vs annual | n | mean |
+|---|---|---|---|
+| 1996–2020 | mutual fund vs mutual fund — same instrument | 92 | −0.1bp |
+| 2021 | cutover year, nine months mutual fund + three ETF | 4 | +3.1bp |
+| 2022–2026 | ETF vs mutual fund — ~0.11pp/yr expense gap | 20 | +12.1bp |
+
+The pooled mean of +2bp is not the floor getting tighter. It is 92 zero-mean
+observations diluting 20 offset ones — and the cutover year sits neatly
+between them, at about a quarter of the offset, which is exactly the three
+ETF months out of twelve. `|mean| + 4sd` on a sample like this describes
+neither half.
+
+**2. A 40bp warn threshold would immediately flag data nobody touched.**
+`INTL_TOTAL` 2023 has a residual of 43.9bp — the largest in the file,
+documented, explained by term (3), and present before any of this work. Warn
+at 40 and the shipped file reports `WARN` on it from day one. A threshold whose
+first act is to flag its own baseline is the same defect this harness has
+already had once, in the composite check.
+
+**3. The tightening argument is still real, but it is per-era, not global.**
+Over 1996–2020 the floor genuinely is much tighter: `US_500` puts 25 of its 31
+years inside ±2bp. A 60bp warn is very loose there and would miss a small
+systematic error confined to the backfill. The right response is a per-era or
+per-series tolerance, not a global 40 — and that is more machinery than is
+justified before there is a second backfill to calibrate it against.
+
+**Practical guidance.** Leave the defaults alone for `check` on the full file.
+When verifying a backfill *fragment* in isolation, where the basis is uniform
+and term (2) is absent, run it at the tighter numbers:
+
+```
+node verify.mjs check candidate.json --annual ../core/src/data/benchmarks.json \
+  --warn-bp 40 --fail-bp 80
+```
+
+The composite check's own thresholds are a separate matter and *did* move; see
+the header of `src/composite.mjs`. Its per-year floor was only ever inheriting
+120bp from this table for want of a measurement of its own, and the rolling
+fit finally provides one: 41bp clean against 134bp for a price-only series.
+
 ## Why price-only detection uses a different number
 
 The residual above is arithmetic: `compounded − annual`. For flagging a year

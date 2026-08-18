@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """GLOBAL_EQUITY vs its parts, with the market weight allowed to MOVE.
 
-verify.mjs's composite check fits ONE pooled US/non-US weight across the whole
-overlap. That is right for a five-year window and wrong for a sixteen-year one:
-the US share of world market cap genuinely rose from ~37% to ~63% over
-2010-2026, so a single pooled weight cannot fit both ends and the check reports
-large per-year disagreements at both extremes.
+The evidence behind the rolling fit now in src/composite.mjs. It refits the
+weight YEAR BY YEAR, which is the crudest way to let the weight move: if
+GLOBAL_EQUITY is what it claims to be, the yearly residuals collapse and the
+fitted weight drifts smoothly, and if it were corrupt no per-year weight would
+rescue it. Pooled: rms 25.4bp, worst annual disagreement 162bp. Per year: rms
+16.7bp, worst 40bp, weight monotone 37.1% -> 62.8%. That is a real market
+weight, not a data defect.
 
-This script refits the weight year by year. If the series is what it claims to
-be, the yearly residuals collapse and the fitted weight drifts smoothly. If
-GLOBAL_EQUITY were corrupt, no per-year weight would rescue it.
+The shipped check does NOT use a per-year refit. It uses a rolling 18-month
+window, because the per-year compounded disagreement is the error-level test
+and fitting a weight on the same twelve months you then score is circular —
+see the header of src/composite.mjs for the measurement. This script stays as
+the diagnostic that made the case.
 """
 import json, os, sys
 
