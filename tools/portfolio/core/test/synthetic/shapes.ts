@@ -46,7 +46,18 @@ export const NOW = new Date('2026-08-18T00:00:00Z');
 export const run = (rows: InputRow[], extra: Partial<PortfolioInput> = {}): AnalysisResult =>
   analyse({ rows, feePct: 0, ...extra }, benchmarks, strategies, referenceId, NOW);
 
-/** Facts about `benchmarks.json`, asserted in `long-history.test.ts`. */
+/**
+ * Facts about `benchmarks.json`, asserted in `long-history.test.ts`.
+ *
+ * These are the coverage of the WHOLE catalogue, which is the intersection of
+ * the series it uses and so is set by its shortest member. Since v1.1.0 that
+ * member is TARGET_2060, which `meta.notes` records as deliberately not
+ * extended; five of the seven monthly series now reach back much further
+ * (US_500, US_TOTAL and BOND_TOTAL to 1996-01, INTL_TOTAL to 2004-01,
+ * GLOBAL_EQUITY to 2010-01). Per-series coverage is pinned in
+ * `long-history.test.ts`; do not read the two constants below as the extent
+ * of the data.
+ */
 export const COVERAGE_FIRST_MONTH = '2021-10';
 export const COVERAGE_LAST_MONTH = '2026-07';
 export const COVERED_MONTHS = monthRange(COVERAGE_FIRST_MONTH, COVERAGE_LAST_MONTH);
