@@ -89,6 +89,21 @@ export type {
   FindMatchedFlowsOptions,
 } from './transfers';
 
+/**
+ * The constructed target-date reference. Data-injected like everything else
+ * here: `glide-path.json` ships beside `benchmarks.json` and is passed in, so
+ * a consumer that never offers a target-date comparison never carries the
+ * table. `strategies.json`'s `targetDate` block supplies the copy.
+ */
+export {
+  glideWeights,
+  scheduleFor,
+  decimalYearOfMonthEnd,
+  targetDateStrategy,
+  targetDateReferences,
+  TARGET_DATE_SERIES,
+} from './glide';
+
 export type {
   AnalysisErrorCode,
   InputRow,
@@ -108,3 +123,11 @@ export type {
   MarketWeight,
   AnalysisResult,
 } from './engine';
+
+export type {
+  GlidePoint,
+  GlideSchedule,
+  GlideSource,
+  GlidePathData,
+  TargetDateTemplate,
+} from './glide';

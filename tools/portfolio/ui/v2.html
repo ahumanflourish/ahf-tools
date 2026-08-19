@@ -1,0 +1,1651 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What you kept of the available gain — A Human Flourish</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,100..900,0..100,0..1&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Palette */
+  --cream: #f5f0e8;  --warm-black: #1a1715;  --terracotta: #c17c5a;
+  --sage: #7a8b6f;   --dusty-blue: #6b8a9e;  --gold: #c4a86b;
+  --stone: #948a7c;  --deep-green: #4a5e3f;  --moss: #8a9e6b;
+  --bark: #6b5a4a;
+
+  /* Roles */
+  --surface: var(--cream);
+  --surface-raised: #fbf8f3;
+  --ink: var(--warm-black);
+  --accent: var(--terracotta);
+  --line: var(--stone);
+  --line-soft: #ddd4c6;
+  --subtle: var(--stone);
+  --muted: var(--bark);
+  --marker: var(--sage);
+
+  /* State */
+  --positive: var(--sage);          --positive-soft: #e8ede4;
+  --attention: var(--terracotta);   --attention-soft: #f6e7de;
+  --inactive: var(--stone);
+
+  /* Motion */
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --slow: 1200ms;
+  --fast: 300ms;
+
+  /* Tracking */
+  --tracking-label: 0.18em;
+  --tracking-control: 0.12em;
+  --tracking-micro: 0.15em;
+
+  /* Borders */
+  --border-thin: 1px; --border-normal: 1.5px; --border-thick: 2px;
+  --inset-double: 3px;
+  --radius: 0;
+
+  /* Type */
+  --text-micro: 8px;
+  --text-label: 10px;
+  --text-meta: 11px;
+  --text-control: 12px;
+  --text-body: 16px;
+  --leading-display: 1.15;
+  --text-h1: clamp(24px, 3vw, 30px);
+  --text-h2: 20px;
+  --text-h3: 18px;
+  --text-figure: clamp(36px, 5vw, 48px);
+
+  --rail: clamp(248px, 25vw, 320px);
+
+  /* ── The bar's four fills ─────────────────────────────────────────────
+     V1 settled that terracotta is the USER. That holds here, and it decides
+     the rest: the segment that is the user's is the gain they KEPT, so
+     terracotta goes there. It is the brand's emphasis colour spent on the
+     subject of the page, and — this matters — it keeps terracotta off the
+     "given up" side, where an attention colour would read as blame rather
+     than as emphasis.
+
+     These are FILLS, not 2px strokes, so the rules differ from V1's: a large
+     filled area is detected easily, but any text laid on it needs 4.5:1, and
+     two adjacent fills need real separation with no dash pattern available to
+     carry it. So contrast is checked twice — fill against the surface it is
+     drawn on, and label against the fill — and the smallest segment always
+     gets the highest-contrast fill.
+
+       role                       token        on raised   text on it
+       gain you kept              terracotta      3.15:1    ink   5.35:1
+       given up — the fee         bark            6.22:1    cream 5.81:1
+       given up — everything else dusty-blue      3.44:1    ink   4.89:1
+       ahead of the reference     deep-green      6.69:1    cream 6.25:1
+
+     The plot sits on --surface-raised, as V1's does; that is what lifts
+     terracotta from 2.94 to 3.15 and dusty-blue from 3.22 to 3.44.
+
+     bark for the fee: it is the smallest segment on the bar (5.9% here, 47px
+     at 1280 and 20px at 640) and bark is the strongest contrast available
+     short of ink, so the narrowest thing is the most visible thing. It is
+     also dark and unsaturated rather than hot — the fee is a cost charged in
+     every market whatever happens, and it should read as weight, not alarm.
+
+     dusty-blue for everything else: the palette's only cool hue, and the only
+     one that clears CVD separation against terracotta (ΔE 10.0 protan; stone,
+     the semantically tidier choice, is 4.7 and fails). "Everything else" is
+     also the one quantity in the bar the tool does not name a cause for, so a
+     different family of colour for a different kind of claim is honest.
+
+     deep-green for the surplus, and only in the outperformed state: highest
+     contrast of the four, given to what is then the small segment, and it
+     never shares a bar with bark (when forgone <= 0 the fee share is 0), so
+     the one bad pair in this set — deep-green/bark, ΔE 1.6 protan — cannot
+     occur. v2-series-validator.py asserts that. */
+  --cap-kept:  var(--terracotta);
+  --cap-fee:   var(--bark);
+  --cap-other: var(--dusty-blue);
+  --cap-ahead: var(--deep-green);
+  --plot-surface: var(--surface-raised);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  font-size: var(--text-body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.display {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'WONK' 1, 'SOFT' 100, 'opsz' 72;
+  font-weight: 300;
+  line-height: var(--leading-display);
+  margin: 0;
+}
+
+.label {
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  font-size: var(--text-control); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-label);
+  color: var(--marker);
+  margin: 0;
+}
+
+.page { max-width: 1200px; margin: 0 auto; padding: 30px 40px 88px; }
+.masthead { margin-bottom: 16px; }
+.head { margin-bottom: 18px; }
+h1.display { font-size: var(--text-h1); max-width: 30ch; color: var(--accent); }
+.lede { margin: 9px 0 0; max-width: 74ch; color: var(--muted); font-size: 16px; }
+.lede strong { font-weight: 600; color: var(--ink); }
+
+.card {
+  position: relative;
+  border: var(--border-thick) solid var(--line);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 26px 28px 24px;
+  transition: border-color var(--slow) var(--ease);
+}
+.card::before {
+  content: ""; position: absolute; inset: var(--inset-double);
+  pointer-events: none;
+  border: var(--border-thick) dashed color-mix(in oklab, var(--line) 30%, transparent);
+  transition: border-color var(--slow) var(--ease);
+}
+
+/* ── Layout, and the whole layout-stability argument ────────────────────
+   V1's rule, kept verbatim: EVERY control comes before EVERY block whose
+   height depends on what is selected. The head carries the two buttons, the
+   rail carries the radios, and both sit above the cautions, the note, the
+   meta line and the data-quality panel — all four of which appear, disappear
+   and change length as the reference changes.
+
+   V2 adds a problem V1 did not have. Its headline claim is state-dependent by
+   design: it MUST be able to say "you did fine", and that sentence is a
+   different length from "you gave up $6,638". The claim also has to sit above
+   the bar, because burying the punchline under the picture is not an option.
+   So the claim block and the line under the bar are the two blocks here whose
+   height is RESERVED — measured across every state this page can enter, at
+   the current width, and pinned to the tallest. See reserve() in the script.
+   Nothing below them moves when the wording changes, which is why the audit
+   passes rather than why it was written to be lenient. */
+.chart-layout {
+  display: grid;
+  grid-template-areas: "head" "claim" "plot" "undr" "rail" "caut" "note" "foot" "dq";
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: 28px;
+}
+.chart-head { grid-area: head; }
+.claim      { grid-area: claim; }
+.plot-wrap  { grid-area: plot; }
+.under      { grid-area: undr; }
+.rail       { grid-area: rail; }
+.cautions   { grid-area: caut; }
+.scale-note { grid-area: note; }
+.chart-foot { grid-area: foot; }
+.dq         { grid-area: dq; }
+
+.rail { margin-top: 22px; padding-top: 16px; border-top: var(--border-thin) dotted var(--line); }
+@media (min-width: 1060px) {
+  .chart-layout {
+    grid-template-areas:
+      "head rail" "claim rail" "plot rail" "undr rail"
+      "caut rail" "note rail" "foot rail" "dq rail" ".   rail";
+    grid-template-columns: minmax(0, 1fr) var(--rail);
+    grid-template-rows: auto auto auto auto auto auto auto auto 1fr;
+  }
+  .rail {
+    align-self: start; margin-top: 0; padding-top: 0;
+    border-top: 0; padding-left: 26px;
+    border-left: var(--border-thin) dotted var(--line);
+  }
+}
+
+.chart-head {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: flex-end; gap: 10px 14px;
+  margin-bottom: 14px;
+}
+.chart-actions {
+  display: flex; flex-wrap: wrap; justify-content: flex-end;
+  align-items: center; gap: 10px 12px; margin-left: auto;
+}
+
+.choice {
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  font-size: var(--text-control); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-control);
+  padding: 6px 12px; cursor: pointer; background: transparent;
+  color: color-mix(in oklab, var(--ink) 55%, transparent);
+  border: var(--border-thin) dotted var(--line); border-radius: var(--radius);
+  white-space: nowrap;
+  transition: border-color var(--fast) ease-out, color var(--fast) ease-out,
+              background-color var(--fast) ease-out;
+}
+.choice[aria-pressed="true"], .choice[aria-expanded="true"] {
+  border-style: solid; border-color: var(--ink);
+  color: var(--ink); background: color-mix(in oklab, var(--accent) 12%, transparent);
+}
+.choice .count { font-variant-numeric: tabular-nums; opacity: 0.75; margin-left: 6px; }
+
+/* ── the claim ──────────────────────────────────────────────────────────
+   The headline the tool is here to make, and the one it is easiest to
+   overstate. It is a statement, not a section title, so it takes --ink rather
+   than the accent: the page title above is already terracotta, and colouring
+   this terracotta too would tie the sentence to the KEPT segment, which is
+   the one thing it is not about. The figure inside it is Fraunces, tabular,
+   and comes straight from capture — never rounded to a rounder number. */
+.claim {
+  margin: 0 0 20px;
+  /* Reserved height (see reserve() in the script) leaves slack in the states
+     whose wording is shorter than the longest one. The slack goes ABOVE the
+     text, so the claim always sits hard against the bar it is about; a hole
+     between a sentence and the picture it describes reads as a bug, and the
+     same hole under a row of buttons reads as air. */
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.claim-line {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'WONK' 1, 'SOFT' 100, 'opsz' 72;
+  font-weight: 300; line-height: var(--leading-display);
+  font-size: var(--text-h2); color: var(--ink); margin: 0;
+  max-width: 30ch;
+  font-variant-numeric: tabular-nums;
+}
+.claim-sub {
+  margin: 9px 0 0; max-width: 72ch;
+  font-size: 14px; line-height: 1.55; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.claim-sub b { font-weight: 600; color: var(--ink); }
+/* The good-news finding, rendered where the bad news would be and in the same
+   place — not below the fold, not in a tooltip. Its wording is the engine's,
+   verbatim. */
+.claim-good {
+  margin: 12px 0 0; padding: 9px 12px;
+  border: var(--border-thin) dashed var(--marker);
+  background: var(--positive-soft);
+  font-size: 13px; line-height: 1.5; color: var(--muted);
+  max-width: 72ch;
+}
+.claim-good.is-plain {
+  border-style: dotted; border-color: var(--line-soft);
+  background: var(--surface-raised); color: var(--muted);
+}
+.claim-good.is-plain b { display: inline; font-size: inherit; text-transform: none; letter-spacing: 0; margin: 0; font-weight: 600; color: var(--ink); }
+.claim-good b {
+  display: block; font-weight: 600; color: var(--ink);
+  font-size: var(--text-micro); text-transform: uppercase;
+  letter-spacing: var(--tracking-micro); margin-bottom: 3px;
+}
+
+.plot-wrap { position: relative; }
+svg.bar { display: block; width: 100%; overflow: visible; }
+
+.seg-value {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'WONK' 1, 'SOFT' 100, 'opsz' 24;
+  font-weight: 400; font-size: 21px; font-variant-numeric: tabular-nums;
+}
+.seg-value.is-out { font-size: 15px; fill: var(--ink); }
+.seg-pct {
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  font-size: var(--text-label); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-micro);
+  font-variant-numeric: tabular-nums;
+}
+.seg-pct.is-out { fill: var(--subtle); }
+.seg-name {
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  font-size: var(--text-label); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-micro);
+  fill: var(--muted);
+}
+.brk-cap {
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  font-size: var(--text-meta); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-micro);
+  fill: var(--ink); font-variant-numeric: tabular-nums;
+}
+.brk-cap.is-quiet { fill: var(--subtle); }
+
+/* Tooltip — V1's, unchanged in grammar: raised surface, border for lift,
+   never a shadow. */
+.tip {
+  position: absolute; top: 0; left: 0;
+  min-width: 186px; max-width: 280px; pointer-events: none;
+  background: var(--surface-raised);
+  border: var(--border-normal) solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px 11px;
+  opacity: 0; transition: opacity var(--fast) ease-out;
+  z-index: 3;
+}
+.tip[data-show="1"] { opacity: 1; }
+.tip-head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.tip-key { display: block; width: 14px; height: 14px; flex: none; }
+.tip-name {
+  font-size: var(--text-label); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-micro);
+  color: var(--ink);
+}
+.tip-val {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'WONK' 1, 'SOFT' 100, 'opsz' 24;
+  font-weight: 400; font-size: 20px; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.tip-share {
+  margin-top: 4px; font-size: var(--text-meta); color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.tip-note {
+  margin-top: 8px; padding-top: 7px;
+  border-top: var(--border-thin) dotted var(--line);
+  font-size: var(--text-meta); line-height: 1.4; color: var(--subtle);
+}
+
+/* The line beneath the bar: the denominator, stated. Reserved height, because
+   the reference's name is in it and names are different lengths. */
+.under {
+  margin-top: 14px; padding-top: 12px;
+  border-top: var(--border-thin) dotted var(--line-soft);
+  font-size: var(--text-meta); line-height: 1.55; color: var(--muted);
+  max-width: 88ch; font-variant-numeric: tabular-nums;
+}
+.under b { font-weight: 600; color: var(--ink); }
+
+.cautions:not(:empty) { margin-top: 20px; }
+.caution-strip {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 10px 13px; margin-bottom: 10px;
+  border: var(--border-thin) dashed var(--attention);
+  background: var(--attention-soft);
+  font-size: 13px; line-height: 1.5; color: var(--muted);
+}
+.caution-strip:last-child { margin-bottom: 0; }
+.caution-strip svg { flex: none; margin-top: 3px; color: var(--attention); }
+.caution-strip b { font-weight: 600; color: var(--ink); }
+
+.scale-note:empty { display: none; }
+.scale-note {
+  margin-top: 18px; padding: 9px 0 9px 13px;
+  border-left: var(--border-thick) solid var(--line-soft);
+  font-size: var(--text-meta); line-height: 1.55; color: var(--muted);
+  max-width: 88ch;
+}
+.scale-note b { font-weight: 600; color: var(--ink); }
+.scale-note[data-kind="on"] { border-left-color: var(--marker); }
+.scale-note p { margin: 0; }
+.scale-note p + p { margin-top: 7px; }
+
+.chart-foot {
+  display: flex; flex-wrap: wrap; gap: 6px 18px;
+  margin-top: 18px; padding-top: 14px;
+  border-top: var(--border-thin) dotted var(--line);
+  font-size: var(--text-meta); color: var(--subtle);
+}
+.chart-foot span { font-variant-numeric: tabular-nums; }
+
+.dq { margin-top: 22px; }
+.dq-panel { padding-top: 14px; border-top: var(--border-thin) dotted var(--line); }
+.dq-panel .label { margin-bottom: 10px; }
+.dq-note {
+  margin: 0 0 10px; padding: 10px 13px;
+  border: var(--border-thin) dashed var(--line);
+  background: var(--surface-raised);
+  font-size: 13px; line-height: 1.5; color: var(--muted);
+  max-width: 88ch;
+}
+.dq-note:last-child { margin-bottom: 0; }
+
+/* Table view */
+.table-wrap { margin-top: 24px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+caption {
+  text-align: left; padding-bottom: 10px;
+  font-size: var(--text-label); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-micro);
+  color: var(--subtle);
+}
+th, td {
+  text-align: right; padding: 6px 10px;
+  border-bottom: var(--border-thin) dotted var(--line-soft);
+  font-variant-numeric: tabular-nums;
+}
+th:first-child, td:first-child { text-align: left; }
+thead th {
+  font-size: var(--text-label); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-micro);
+  color: var(--subtle);
+  border-bottom: var(--border-thin) solid var(--line);
+}
+tr.is-total th, tr.is-total td { border-bottom: var(--border-normal) solid var(--line); font-weight: 600; color: var(--ink); }
+tr.is-sub th { padding-left: 26px; color: var(--muted); font-weight: 400; }
+td.is-empty { color: var(--subtle); }
+.table-key { margin-top: 18px; }
+.table-key dl { margin: 8px 0 0; font-size: 13px; line-height: 1.5; }
+.table-key dt {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 600; color: var(--ink); margin-top: 10px;
+}
+.table-key dt i { display: block; width: 14px; height: 14px; flex: none; }
+.table-key dd { margin: 2px 0 0 22px; color: var(--muted); max-width: 78ch; }
+
+[hidden] { display: none !important; }
+
+.notes { margin-top: 44px; max-width: 76ch; }
+.notes .label { margin-bottom: 12px; }
+ul.brand { list-style: none; padding-left: 0; margin: 0; }
+ul.brand li {
+  position: relative; padding-left: 22px; margin-bottom: 10px;
+  font-size: 14px; line-height: 1.55; color: var(--muted);
+}
+ul.brand li::before { content: "→"; position: absolute; left: 0; color: var(--subtle); }
+
+a { color: inherit; text-decoration: underline; text-decoration-style: dotted;
+    text-underline-offset: 3px; transition: color var(--fast) ease-out; }
+a:hover { color: var(--accent); text-decoration-style: solid; }
+:where(a, button, input, [tabindex]):focus-visible {
+  outline: var(--border-thick) dotted var(--accent); outline-offset: 2px;
+}
+::selection { background: var(--accent); color: var(--surface); }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+/* ── The picker — V1's rail, single-select ──────────────────────────────
+   Radios, not checkboxes, and that is not a style choice. `capture` is
+   defined against exactly ONE reference: available = that strategy's ending
+   value less what you put in. There is no such thing as the available gain
+   against three strategies at once, so the control may not offer it. */
+.rail-head { margin-bottom: 10px; }
+.rail-head .label, .rail-sub .label { margin-bottom: 7px; }
+.rail-note { margin: 0; font-size: var(--text-meta); line-height: 1.5; color: var(--muted); }
+.rail-sub {
+  margin-top: 15px; padding-top: 12px;
+  border-top: var(--border-thin) dotted var(--line-soft);
+}
+.rail-sub .label { margin-bottom: 0; }
+
+.refs { list-style: none; margin: 9px 0 0; padding: 0; }
+.ref {
+  position: relative;
+  padding: 7px 9px 8px; margin-bottom: 2px;
+  border: var(--border-normal) dotted transparent;
+  border-bottom-color: var(--line-soft);
+  transition: border-color var(--fast) var(--ease), background-color var(--fast) var(--ease);
+}
+.ref[data-state="on"] { border-style: solid; border-color: var(--ink); background: var(--surface-raised); }
+.ref[data-state="blocked"] { border-bottom-style: dashed; border-bottom-color: var(--line); opacity: 0.74; }
+.ref[data-pop="open"] { border-color: var(--ink); border-style: solid; }
+.ref[data-pop="caution"] { border-color: var(--attention); border-style: solid; }
+
+.ref-line { display: flex; align-items: center; gap: 8px; }
+.ref-label {
+  display: flex; align-items: center; gap: 9px; cursor: pointer; margin: 0;
+  flex: 1 1 auto; min-width: 0;
+  font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.3;
+}
+.ref[data-state="blocked"] .ref-label { cursor: not-allowed; color: var(--subtle); }
+/* A radio is a circle in every other interface on earth, and this brand's
+   radius rule is about boxes, not about the one control whose SHAPE is how
+   people know it is exclusive. The square box is the checkbox; the disc is
+   the radio. */
+.ref-label input {
+  appearance: none; -webkit-appearance: none;
+  width: 15px; height: 15px; flex: none; margin: 0;
+  border: var(--border-normal) solid var(--line);
+  border-radius: 50%;
+  background: var(--surface); cursor: inherit;
+  transition: border-color var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
+}
+.ref-label input:checked { border-color: var(--ink); box-shadow: inset 0 0 0 3px var(--surface), inset 0 0 0 15px var(--ink); }
+.ref-label input:disabled { border-style: dashed; }
+.ref-tools {
+  display: grid; align-items: center; flex: none;
+  grid-template-columns: var(--tool-size) var(--tool-size);
+  gap: 10px; --tool-size: 24px;
+}
+.ref-pop-btn {
+  display: grid; place-items: center;
+  width: var(--tool-size); height: var(--tool-size); padding: 0; flex: none;
+  grid-row: 1; grid-column: 2;
+  background: transparent; cursor: pointer; color: var(--muted);
+  border: var(--border-thin) dotted var(--line); border-radius: var(--radius);
+  transition: border-color var(--fast) var(--ease), color var(--fast) var(--ease),
+              background-color var(--fast) var(--ease);
+}
+.ref-pop-btn svg { display: block; }
+.ref-pop-btn:hover { border-style: solid; color: var(--ink); }
+.ref-pop-btn[aria-expanded="true"] {
+  border-style: solid; border-color: var(--ink); color: var(--ink);
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+}
+.ref-pop-btn.is-caution { color: var(--attention); border-color: var(--attention); grid-row: 1; grid-column: 1; }
+.ref-pop-btn.is-caution:hover,
+.ref-pop-btn.is-caution[aria-expanded="true"] { color: var(--attention); border-color: var(--attention); }
+
+.ref-pop {
+  position: absolute; z-index: 4; left: 0; right: 0;
+  top: calc(100% + var(--border-normal));
+  margin-top: calc(-1 * var(--border-normal));
+  padding: 9px 11px 10px;
+  background: var(--surface-raised);
+  border: var(--border-normal) solid var(--ink);
+  border-radius: var(--radius);
+  font-size: 12.5px; line-height: 1.45; color: var(--muted);
+  outline: 5px solid var(--surface);
+  animation: pop-in var(--fast) var(--ease);
+}
+.ref-pop::after {
+  content: ""; position: absolute; z-index: 1;
+  width: 9px; height: 9px;
+  left: var(--notch-x, 50%); top: calc(-1 * var(--border-normal));
+  margin-left: -4.5px;
+  background: var(--surface-raised);
+  border-left: var(--border-normal) solid var(--ink);
+  border-top: var(--border-normal) solid var(--ink);
+  transform: translateY(-50%) rotate(45deg);
+}
+.ref-pop.is-caution::after { border-color: var(--attention); background: var(--attention-soft); }
+.ref-pop.is-caution { border-color: var(--attention); background: var(--attention-soft); }
+.ref-pop.is-caution b {
+  display: block; font-weight: 600; color: var(--ink);
+  font-size: var(--text-micro); text-transform: uppercase;
+  letter-spacing: var(--tracking-micro); margin-bottom: 3px;
+}
+@keyframes pop-in { from { opacity: 0; } to { opacity: 1; } }
+.ref-reason { margin: 8px 0 0 23px; font-size: var(--text-meta); line-height: 1.4; color: var(--subtle); font-style: italic; }
+.ref-meta { margin: 3px 0 0 24px; font-size: var(--text-meta); color: var(--subtle); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 640px) {
+  .page { padding: 32px 20px 64px; }
+  .card { padding: 20px 16px 18px; }
+  .masthead { margin-bottom: 14px; }
+  .ref { padding: 7px 6px 8px; }
+  .ref-reason { margin-left: 0; }
+  .ref-tools { gap: 14px; }
+  .tip { padding: 9px 11px 10px; min-width: 160px; }
+}
+@media (pointer: coarse) { .ref-tools { gap: 14px; --tool-size: 32px; } }
+
+@keyframes bar-swap { from { opacity: 0.3; } to { opacity: 1; } }
+svg.bar.is-swap { animation: bar-swap var(--fast) var(--ease); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+<main class="page">
+
+  <div class="masthead">
+    <a href="https://ahumanflourish.com" style="display:inline-block;line-height:0">
+      <img src="data:image/webp;base64,UklGRhAYAABXRUJQVlA4IAQYAABQXACdASqQAWsAPpE6mEgloyKhLHS9qLASCUZ0e4ukItYQpmR0CvFtK07m39/TlYxWX7U9m5CfwH7L3+f9SXk++mj0S+ZTzdvOM353enf79kwPlT/O9t/fL50AM7TftSoP/qO9H9t8Qj2jumIAPyf+n+cd9h5jeIB44f+HwYfrH/A9gX+l/5r1kv9nyB/u3/G9g7pS+jSoahLQjTDmXRhnd/sb5royDhVXBK9Y5383b05UvA1sP1h/Y0q1uNQb+VM9xMDCGpKatwINwZOzI43y8jFmUaY6lcB88dYc2eMP2/Q7PGEaNS53cMJMbbBapT0xxaZ7Dh5VSwQUUcDx+EXe7X42tdMVbJoBRAIsm2VFhGijiaU7IqvAtC+APqre9fszNR/H/m0iXWDPq/B3ELFqVN1zQ8Vid4rXm7PX4humFBIQxDpL5vp4BlErGuEbaRqaM0UuYS0IY54oPi1ZT/4ZTjDXq4yhzyNgejwQ3tW6q/BBLHWmm5DBXEbamT/dZo2C/wmFC7d66gq4H9IDejXxC05smZTJO2c2MeJd0kFtjZ597QbOr7g676NZNuYNDc6Ij5jgpSl9iH9eW+yCol6MuDeEwdWCyb4i94P4c65cm9alevZQDdsusEn9WRuZthTMTyhIjVZkT0KJUVvSc2rB51DEsj+KA9Htr5EuEYyhq/Fc5URRF0cSmzFD+bWzLrkG26rEN2EbRItnh0lXmmWkLn/4rBeOKO+dAQnm0LO0nw2uGOAXnYYZzCvNFQ7vY25PuD9YRMWmR9fyqCzVEf8P7z7g2+cIP9cGAN+FEpr1RxvlRW5KDfXFhd8m43AKIOrh49H8AQp2CPrPbXiBNmBeTBbmA1FWskncNVal4y1GBIKDj1kxChWpXuTKeflLO+NnKeXS1SYkupc73FouJ6m5y2GQY4aKvULGZZhMFSzxm4VGT4YAROd2tRFWbsNkLdZELWPh1TYLMLP1xtRJlErnrnx9V2+1okRbSgAA/sMcMOslIr8p4PsmW+C8vJeTx/81+lrpUDoByM9vy1OB7BMB71Ux1KLUJ4Doz62P8hKqlcurkCBfHNq3+DSXrA6be+PQsEXB9lisnbaqjC09tuEvNQa0AC7GvzWxVWjdLz06wgOvbtILpZKEup1UX8eSL1Fb+wepXoqNqbg/w1lkeuJP48GQ9EUqmlHJEM6oSnjxRNyf6skq3KHBBK6/8owrfdj55NZ/JoDayeg9CQOoggvFPIZreYadDyU0+vk8n/oGTr6XHEtCov0Ja/mCnmjq/zUXDHocixnQI4abb7cWWzwW+5rNK233OUaeRaFiid2bNthH48+d6aombuzPt84PLXrw1BrQEmIiZM5fPb8B477NuvYETNG+BQNEnKddFv4jnBJDB7OU8w3mN+WpPa94qbXIww9aV+NAEf87kuceoLU+pzWLLhohjBMQrPqPTuWfuEMK5GPoEy7MkPefVlrAYBZdAy1Fq/6dUi2Naina9fszmhQPHQw/DdV5lcSMAeA72YZjEAn8L6JnVzYrqBgwvvnG7+rKiGPdp5hVteDRYy4F9fyEZ09sYOa2CUN9ByPpz/ioe+9med0RYnFfVoSUYbszm7K9c7PQzC25w2HXBgyVqixTvxrEQhneWsHhAlx2UPkaHF4UR4oQvoP24wGdHbhruWpOiyIZUSGqgLnCRIm9WnNfEKa53Vqlj5q7XU0GgVx+lmrkc8xLC28y1g9v88QVnHbvucY+8n0xFNl8zHrdiZN+V3kC/SDQtYAPT1+K/ptzkHXxAS3XBl2yakQAkF5myGsx4R7MX68w3/bQWiMFEOa0mS+WnWEnVJp5LXvHZih8bK05AmsC2ei7HSVy7vhJlIIlonK302XOXwEutcc6J44C4ZW+E0hmG1N8gesuXjPrk0yQVEyHh8M5y0ETycWUFXPBTg7tb78ba6gs6G/jmFJxHHfw5/ub+uNabLuByo9SlZcW6qKtRTV49j+0fPMaoOQBoZxw5OoW+shRxLJQELHJ59Ol4duO/eNZcAhPDVCZz/BuTNQi0I+OXMgSEkkr0Db8WwAGVgpJIKCXlSXd1ix0bfW8PX9WFGrHO3SSj2JXUFDzIlNyp0HeZBTraK6LOd1+djLABwc6oFTmOF0xv8EVltmbdDn+IGtxJRk5XpOps6MH0zvqZuxbA52F+YPRIxStxtDk/Oaf5zNZMzO+Ph3xcTYJV/4KF9/fjYf793MET5jOZWJm8a1WIrxetPeYT0Jpf/WJw3Y+M/THAVOIeO1tWqxs35zc7OIfvej8h/8ddYWaCIXTjsGWOaAVftftA7VRWrckzzFB+0OMPkguZIGcW7oYldHPdk2bcWqnsm6/XapbJgyDxgPMBkB7JHdwXf4g2BZl2DJV3CCCpdLt99z5iDQ2ytstd8A7/qgB2pUhJK8C5Kut8ttigpjHXUXO5N94bh/3N8qwtObSrUkGfZ/70QtwkcD/vhdsxh76OvvFXMSnXYvcVcHHZLxZT2MdtXtMFGU/o0ss0OcExR0LzFkR2zbIdfD6/gybAHPwiEA9yeB2+Kiorj/HkDcSLVcLunCYbEmbJZiTv40fkCuHk8KFMuJUwnRIzli0POP4EbceMkRjKfwwKhYZ8jHj3Dbz3WihJnGwa239X7lDi4QsvMHktMnlBdexa0XLyHYqmEM+zyT5soCy3cUxLJr/waEqy3JAyY4f927gWbbUwEGnWa5/Mzs+IbwciwYjjYqZUfoomU1+l3YSQfu+4RT+HxBcmStWJeF0/y+4zOeMO5UPJcLQ3dw+gn1kilcF/ExaZpLgvam7cdghijjVdz5lF0YVfZ1lmSVIyTWcuLtaqbRYFIk2Lo6bGhQyEtSyn9CHH4ykwYKmA/Jk1rA7deI0pA/LvSySXUi+3IfefB76gVgE9JU9hXGEE/DYKch4MVIca3MpoNNfe0z9LrV21vklxhEyQFm8OYpwbSvrI6Pu5FidSvMxe1xCfG6mt1b4530Xs9P8iso6dCtO28HS4BdCs+PoTMZHTB0pxgwSUlX6HcLX+NCU1byG7iIIoCI2AnUuMOxMYC/PY5qmpgBKedJ/LP0RBrfZBSlGnV9wPZRizhAwMAJvUzD5rf17gHANtqxmU6EPPMAoXivMIwpdkP7OcIXmBH6IES9x8jpuH7DUVtne30GQRwWlOJ3sYbSAfqcCuORXNrrWoqj0G8E8vCzj0/l3P5o6x/TkuXh/3m9LHP/SjPw9yI/sv5pHX31zdqdzrdPSSz+EWyGP4LIZQOdUpFf7ioiKEoueAp/FeKRjWxqX3oEOwbVpTwAsjJ371qlbx64H7xJW1uXifKMyOO3rjddT631SelXI1HEOEy0GFjDLOV+g3MSc9d/j524uKfHh+cnFFJsRgdTT0R6NdLVuJ3lszSAy6WZhWtYr1ShGUai+QB3hLZXxxWHAHyawugOH7SOXEkkSZRNZ2OT1612jbGY4wC3Ddjc8DT7gU2sh4xIAIoL6pNG4SnkVCKMdkx0M3CD2h7Ej7SR1t1TdYScV1KP2ddlZ4Es07ljNh3XlZN2ryGcTWrzKcK0xKIIzugTK9XM2lta+1JIHfxOekTerwyeMkuMthiVig9A7I398GyGFtLxIMR1vpugfuNEACvwJDANMy1beBtrS1Y3eBVloPdmntB6lycIKmLh4MqPEpODczBIWfIXkuDOy2BCf2fuofzuEKEHzAUktq+uyrd6sWD8dGQ+ceUaP4Kn+p+DJNfGDo4ZkhFfwbsuYrTdi5webCLJvT0b+H6fg6kTDBAtXX1z7bR1DikaOsJmjxc0CjLmNczo5Dbv3fKseLmqYm2uRcfhheKdRyYoi2yqYUU2XUCvKCK2WfJUdsl0o8TPBTMfBwd6orNQJcT/DfCXAsrweKtuMa0+Ks6gzxUxDk5Ip3UFHfTfoUFWKNIb/iUeheLdPuTp260VKX0MIas62LyriI95G+0M3pf16dVYo5oXrz/juWHAqISy3CC530ggk90E8LK6HzaSzFfMktaZDbL9EySiBizmbgnUdsBzBNJC1On5CsksJTug4rYK/6dse05HwYd0xg8rm++OvC29x1pbMdYaH97ut8Z06k0X2aZl+3+eXM7rMS75jhtW1jq/rA/uH5cjRqVEhMxQ7c0kRj6OrtaATQwzto6NEMy80S3GoMjm6E5yXVY1MUxyYbyi214depfrvD2gUIKJOS2KbIiOQerCOMWmy/LyRE6n/U/2opf2iErS3Knr1EXbt7khhnVGOmUilo+WWPpcVOjwgHxvmscOqQpSin6/mlEnfwLUjQ4BrH2cCg4WhtPe3q1xOAlHNfFvkkKgyriBXM47r/SKDVuKmOCBYiGqpQaQckE64ARacIDL7cOGPvoym3wVQJbyZGrVh6Nm6wFs3sfKAFDIJ9mSRWslNPXQbCbZ7aeMIsTeIHw8iYlGhr3mwk/NAVbr+5PKvHa1mWX5pPxjdyZPVUYHjEkqV2NtA2N5GL1XLkNRptUcxigoPeS4uWFk7+ohDL7HCsgJkPyo1wf1e6sAKDOQZn8JS2XgVPkkTjebnVkSzHV1vnKGPcwFwhXUG78GpzDxYLkD92gaIcd8QarFmtiI4b4yOW3EH/w/uIpQ4sRMPbazaIQzI3VyRlnCO5Qb6xISoe5rCWmERCZzRWZJWuInPWZWYsO5vMPiDsc9H1NYRj5F4lXyVkKvzW2j/Nee5dRW5Zg/+H6I/uxdiZqkU2twpjL3+mi5p/gBJEnv1NoXImPIjBhZ1OjcbsC4h3uOi5/B8nrG1KgJnliYoaorD2XqRZd7Tz/2SeTLpG4BFNjplzuzgBdwbgNDQE4qjQff3TPILXu4WVoVjTPPZZBAvTIKUsFrYkobGBGB84HjDFEkJqBrz1EgeDePg59kgDQDw8D/DLb1BXPbUmHPVRcT6te2zN1vDs76NtG1fgovLi2yD2Q68iFh0p/+P15MbG5qKW9qPB86CIgmbU+Rm++c0AVq5rWF2g+YUe6mAcS4ngd1boidaY1/yw1MbQzL+AiVtkYNFHaGMU+HDYNBZOcW1tWVOGjqeQIcG2NePtTytZpqAR4rCK89gjFgRErKOzhH5pS8FgYDsjeQVixXyz6oV2P0ds80LFyI4vaXna+RHjuzn/wx/PYiaboaw43vTsXSFHOCtiU+xsrTuWYG1vOEKqatosXNlLpxA3lltijRpIXtBCc4DYn920jaUB7ABo2MHdjitFQqQBjkDqOmH4Q1iFTOZT4xp2Aq9wo76tM/2HvXALokgbyovOPssT3/uD5btSXIeUdVTAgKns2kL2JoeesQCcbmaD0Qq5hjPK6zACkwRhl1A3Q2O1uilTHTInx42DNBIv1CaeN/p+iKyAvSZwEqnXX5eXiE3lgtjUF0TmYgS2hVqexW3Yt3friK2xubZ+z/NrkpNFv4bCb/RE41U85sHK4Cjw/5SgcjNoSIdfIeQp09IeKUGJD4UW4swWWqNiugBl8mOx4TjhYvcMrm/R7VBIdddjv7QYOqz/ZUms8Z1Ta1CBerjdWsRk9R+KMveiT5+whWRTY9TWN/d6Du0rwZnU6Y45N8BqWyMOJBO57Ai/IfJ+Rdo8qEgRUVzJ0aQy7Mi8eocjhiCiHScWc0ElW/kVj/Hdq975y88ctYP1RjlG51lhsQj89KC3sr8ucJ0NquoJon79m2ILoJjjnZ1c2VJABsX7f/Pdz9Q6WR+TpmG+i4JuRG78i1pR78i5G3lxamqqIWduGjQRs64vM5xPcJ+RLgrGYboc5NoLg6XqczCPdJGYs6S5j9HWRUvyb8/d2qJdbFFvuKbHtKSIU9k9jPdiDxO/+Kou3Mfj/yuWT1ip2wgUaV29H0NJsXSkF6N48ITk7UCWguGJGjdKOq81RZk2q+tVrzUbN1hERN8qi+tU/hPtwlvMY1bUK1tmoe7eu6drtMQwgQhwKP13xFb0vzUGcS9SKFcEqd0l8Pqf4JoMTUKd8eK7A07SluL0lq4msZtyBT0BIf6KiOULdqaTwP3nrbfTNjmskovM4DSsGY1ljq6lNsqHmbboTQHHxo8PANCjwhXS09SaDRpV5G0FJCcH8uAIZvYQjmw6n01PwvG3e8Aj3GNWYMHU/X/tDvpgxtJCpAXptqqZc8PdO+0/k1HxQ0flG+RC/PbqTiWNU4mZ+ePPbJYc/oP/NoS4IGOC4IIilNRzUVom9b/PAoOEEqN9EO2X0+oUTa8jAS5zD3wwdiXOH7UanXUg5h3Mg78VFhxNBsRAN+nZyQgSLo8XAf5jUe+g2Ndrh4IqizPw+18rvFDhtr4+dg/rRCJi6GU5vO/uzS2sHog3rr9IirEZmjSFO5Qp1fQZtjowIiRDd8fXi6T+tz/rKuZ7C8Kq27D8WeutPggKMpNqAVj0jlCVCGXjbHD+AZAeR4bkl6bakkiZPi+TXPOZfkqHxDWDEO1w+frM6neW4YI9TtmYMrNgpv9ACzKI3XDG7Ywxqlh0bYuH0hlP0oUa7tKq5BFZqqTS6IKJ3A66jdrdEwrXcuIcqqTcVpGi/dvFsnLfEWqculyfwwqBbgVDzSfEGahBJXrO52xrhk7beHfvFSQfnk2SugB9XrxPWQzvprDFeIU5F6yOx4m0wesjRfHzGkN5Djle3TKjGf8nyQQHPwmurPZqE8v36B2iPhcxkJeN5qnqG99t2PoA+Sgxr/3d3Wa4DF4a2fE30QRjlr4Il95KP2zdLxMWKxo0vXXNBzXjHCFqDn4EQ5dtE5RH1XovsyMNQ5o+ARUfBENwc7MPEnD315wS+7K/AXNViiUaNP1rQXSL+pSWR0eaGK5Sdk/1EmKS9llfUPim3m3SRUnGxmpfbbueT+4BBWvRxv4SX1v0K1qLh2GcZsR9dO8PCtN2Dq3iOePYO/qzFnioSUvw8/UQG60ochbuMOd9V7tT11RbuaJVRPM4xCIiyExbtEIyiXlDhYsd8Eey5Mav5ukyiwdLFhwPme5K8dRwaQJyaw2D8pSwwH4W9hH3T/p+4un0lsipxihtOsSWk1/wBvFyIWSf+L/C8f88isYqIEoeP0+V+DVj8RU8aslvDSZuHzLNVgw+cUlQdsBLIyEbd31HTvK9fKQInZb+sC+01Qk96ZFwxP/y2bRIQ3XUA3aa7R9oiXwftnWYXLX6GNoY1U8vqjCvtu822y9q5dWfHZ8EyALJRTf3CO10d0Fr6HL/jfGQKFWubk+4b0EE08MX1oamc+w8CiR+lxvydcLn5G5Kjdt+Ni3IMjSnokhGLVqb8427ms04+a4dMfoAhdIF46+bIUrqnfGe6/t6/R/kiz51mqT+Rj6HkqB/KpS13UZmgOnP1af0QGKLWYZo+n+jQCrzAf+FIqeq0BoL3B1GTyJrCCqsOA+fQY9jee1M1pdtsIwzflns9bXnpmpkl2Urzf1i7tJ7ajcpf/OMx06SX6B36dsVDZLsY0IdxbgwxEnnEu/6H+DYLaKEi4wJuqGRfWOgA1q0IXiz3KLXgtPW1O7S43xOs32Tg2U6Mq1gjtJiYVulYm77yNbPUh+c9hhAfmpmoklFJANDq4Vja7nCGnZSSHklLEWy/popaP0vGRbb5G6B+eMxbiY+vYZnIwp7dC3y5TP6ZpjTY0HMe9ClhYZAXnBL/cX6w2qlUhxVIYGg4/0oVUCv+lc/pTLDAWnwdkFBLHB/NwyxBgc1nV6Kt66uHUwMKVR2YRbWMAX8Qw1TETiU4Tseu0b9xYG6kGfKgGyItf+SlTL1mqkiH6RJkLkktcoC1qM9pjegVqp3gcxjoZ6mdAWxtkEHF3mE/ffVYi4Oo77zfMRcMVioi0b3j7cEKC+N4qFgZ0rNzAl5IYDBBFkT2LO7caTtQkYgxzMnpVxbTZ4FnMNSWe/dNiRHG2Ws4cWghj3NikP9xR9wa84QltVfL7St4wfq+pq1s6I+AEblAsm+005RqRfuVwmbXGBedG1fUA/GB37BJAT/fYkMnjCcGJCuAHs6K15cdFzSIEQDIFO8Tg4CYFGSUO/oKFpaHxdjUvhmL+Zu2J+DTz56k8uB5JFCKWyJ5QCNoCV/1B8OX/iKzBDJ4xl37HNIdhZnePR8YyWJZCkUpX7EGvWM3q5aF7f7Rzh4suYHAT/E0FHs6FZ2me79Trdvvaz/aMYCo0rrUtrQMR2/3bD/oHmP4pWmbUowtgQO9x2jztOfEfQmNdN5ZiuvjNEPJixQlMsJWzi2s/zLnAYcAAA" alt="A Human Flourish" width="180" style="display:block;height:auto">
+    </a>
+  </div>
+
+  <div class="head">
+    <h1 class="display">What you kept of the available gain</h1>
+    <p class="lede" id="lede">Your own deposits are stripped out of this, because nobody gets credit for their own
+      money. What is left is the gain — what your strategy earned on it, against what the same contributions and
+      withdrawals would have earned in a passive reference over the same months. The fee is separated from the rest,
+      because &ldquo;your fee explains this much&rdquo; is a different claim from &ldquo;your strategy explains the rest&rdquo;.</p>
+  </div>
+
+  <section class="card" aria-labelledby="bar-title">
+    <h2 id="bar-title" class="visually-hidden">What you kept of the available gain</h2>
+
+    <div class="chart-layout">
+
+      <div class="chart-head">
+        <div class="chart-actions">
+          <button type="button" class="choice" id="dq-toggle" aria-expanded="false" aria-controls="dq-panel" hidden>Data notes<span class="count" id="dq-count"></span></button>
+          <button type="button" class="choice" id="table-toggle" aria-pressed="false" aria-controls="table-view">Table view</button>
+        </div>
+      </div>
+
+      <div class="claim" id="claim"></div>
+
+      <div class="plot-wrap" id="plot">
+        <div class="tip" id="tip" role="status" aria-live="polite"></div>
+      </div>
+
+      <p class="under" id="under"></p>
+
+      <div class="rail" id="picker">
+        <div class="rail-head" role="group" aria-labelledby="picker-title">
+          <p class="label" id="picker-title">Measured against</p>
+          <p class="rail-note">One at a time. The available gain is defined against a single reference &mdash;
+            there is no such thing as the gain available across three strategies at once &mdash; so this picks one.
+            Every row says what it is, and flags a caution where there is one, before you choose it.</p>
+          <ul class="refs" id="refs" aria-labelledby="picker-title"></ul>
+        </div>
+
+        <div class="rail-sub" role="group" aria-labelledby="fee-title">
+          <p class="label" id="fee-title">Your fee</p>
+          <p class="rail-note" style="margin-top:7px">An input, not a view. A fee of 0 is valid and common. Both
+            settings below are a full re-run of the engine with that fee &mdash; nothing here is scaled or
+            interpolated from the other.</p>
+          <ul class="refs" id="fees" aria-labelledby="fee-title"></ul>
+        </div>
+      </div>
+
+      <div class="cautions" id="cautions" role="region" aria-label="Cautions on the reference strategy shown"></div>
+
+      <div class="scale-note" id="note"></div>
+
+      <div class="chart-foot" id="chart-foot"></div>
+
+      <div class="dq" id="dq">
+        <div class="dq-panel" id="dq-panel" role="region" aria-label="What this data can and cannot tell you" hidden></div>
+      </div>
+
+    </div>
+
+    <p class="visually-hidden" id="bar-desc"></p>
+
+    <div class="table-wrap" id="table-view" hidden>
+      <table>
+        <caption id="table-caption"></caption>
+        <thead><tr id="table-head"></tr></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+      <div class="table-key">
+        <p class="label">What each part is</p>
+        <dl id="table-key-list"></dl>
+      </div>
+    </div>
+  </section>
+
+  <p class="visually-hidden" id="sel-live" role="status" aria-live="polite"></p>
+
+  <div class="notes">
+    <p class="label">Read this alongside it</p>
+    <ul class="brand">
+      <li>This is not investment advice. It makes no recommendation and says nothing about what you should do next.</li>
+      <li>A reference strategy is a yardstick, not a menu. Nothing here says that fund was available to you, in your plan or at that price. It is what the same money in the same months would have done somewhere else.</li>
+      <li>The result is historical and benchmark-dependent. A different reference strategy, or a different period, gives a different answer &mdash; switch the reference in the list and watch every figure on this page move.</li>
+      <li>A short period is a small sample. Five years containing one bear market is thin evidence about anything.</li>
+      <li>Returns aren't the whole job. A fee may also buy tax work, planning, or the coaching that stopped you selling at the bottom. This measures none of that.</li>
+    </ul>
+  </div>
+
+</main>
+
+<script>
+/* Every figure on this page comes out of one place: the engine's own
+   `analyse().capture`, run against the reference fixture. Nothing here is
+   computed in the browser except pixel geometry and percentages of figures
+   that are already in this payload.
+
+     analyse({ ...fixtures.input, holdings: fixtures.holdings, feePct },
+             benchmarks, strategies.strategies, referenceId)
+
+   against build/dist/esm/index.js, once for each of the seven references and
+   each of the two fee inputs — fourteen full runs, none of them derived from
+   another. Checks against the fixture's stated expectations:
+     endingValue 53690.25 · gain 14190.25 · GLOBAL_EQUITY 60328.40
+     capture.available 20828.40 · kept 14190.25 · forgone 6638.15
+     pctKept 0.6813 · feeShare 1222.95 · otherShare 5415.21             */
+const D = {"scenarios":{"feeAsEntered":{"GLOBAL_EQUITY":{"capture":{"available":20828.401081907454,"kept":14190.25,"forgone":6638.151081907454,"pctKept":0.6812932948716035,"pctForgone":0.3187067051283965,"feeShare":1222.9459646365285,"otherShare":5415.205117270925},"findings":[{"id":"fee-minority","severity":"info","title":"The fee explains less than half the difference","detail":"Your fee accounts for roughly 18% of the gap. The rest comes from the strategy itself — allocation, fund selection, or security choice. Negotiating the fee down would not close it."}],"refEndingValue":60328.401081907454,"refXirr":0.13955446880793432},"GLOBAL_8020":{"capture":{"available":16523.712753811058,"kept":14190.25,"forgone":2333.462753811058,"pctKept":0.8587809659622131,"pctForgone":0.14121903403778693,"feeShare":1222.9459646365285,"otherShare":1110.5167891745295},"findings":[],"refEndingValue":56023.71275381106,"refXirr":0.1147257983716764},"GLOBAL_6040":{"capture":{"available":12445.911719031319,"kept":14190.25,"forgone":-1744.338280968681,"pctKept":1.1401535154954838,"pctForgone":-0.1401535154954839,"feeShare":0,"otherShare":0},"findings":[{"id":"outperformed","severity":"info","title":"Your strategy beat the passive reference","detail":"Over this period you finished ahead of the reference strategy. Worth checking whether that came with more risk, and remembering that a few years is a short sample."}],"refEndingValue":51945.91171903132,"refXirr":0.08957667779124023},"TARGET_2060":{"capture":{"available":18959.31290304494,"kept":14190.25,"forgone":4769.062903044942,"pctKept":0.7484580307612829,"pctForgone":0.251541969238717,"feeShare":1222.9459646365285,"otherShare":3546.1169384084133},"findings":[{"id":"fee-minority","severity":"info","title":"The fee explains less than half the difference","detail":"Your fee accounts for roughly 26% of the gap. The rest comes from the strategy itself — allocation, fund selection, or security choice. Negotiating the fee down would not close it."}],"refEndingValue":58459.31290304494,"refXirr":0.1289750892728222},"US_TOTAL":{"capture":{"available":21409.980371671118,"kept":14190.25,"forgone":7219.730371671118,"pctKept":0.6627866889021536,"pctForgone":0.3372133110978464,"feeShare":1222.9459646365285,"otherShare":5996.784407034589},"findings":[{"id":"fee-minority","severity":"info","title":"The fee explains less than half the difference","detail":"Your fee accounts for roughly 17% of the gap. The rest comes from the strategy itself — allocation, fund selection, or security choice. Negotiating the fee down would not close it."}],"refEndingValue":60909.98037167112,"refXirr":0.14278662396201425},"US_500":{"capture":{"available":22902.77396527137,"kept":14190.25,"forgone":8712.523965271372,"pctKept":0.6195865191490512,"pctForgone":0.3804134808509489,"feeShare":1222.9459646365285,"otherShare":7489.578000634843},"findings":[{"id":"fee-minority","severity":"info","title":"The fee explains less than half the difference","detail":"Your fee accounts for roughly 14% of the gap. The rest comes from the strategy itself — allocation, fund selection, or security choice. Negotiating the fee down would not close it."}],"refEndingValue":62402.77396527137,"refXirr":0.150958554071552},"ALL_BONDS":{"capture":{"available":1506.4761752839186,"kept":14190.25,"forgone":-12683.773824716081,"pctKept":9.419498451295208,"pctForgone":-8.419498451295208,"feeShare":0,"otherShare":0},"findings":[{"id":"outperformed","severity":"info","title":"Your strategy beat the passive reference","detail":"Over this period you finished ahead of the reference strategy. Worth checking whether that came with more risk, and remembering that a few years is a short sample."}],"refEndingValue":41006.47617528392,"refXirr":0.012101365453677349}},"fee0":{"GLOBAL_EQUITY":{"capture":{"available":20828.401081907454,"kept":14190.25,"forgone":6638.151081907454,"pctKept":0.6812932948716035,"pctForgone":0.3187067051283965,"feeShare":0,"otherShare":6638.151081907454},"findings":[],"refEndingValue":60328.401081907454,"refXirr":0.13955446880793432},"GLOBAL_8020":{"capture":{"available":16523.712753811058,"kept":14190.25,"forgone":2333.462753811058,"pctKept":0.8587809659622131,"pctForgone":0.14121903403778693,"feeShare":0,"otherShare":2333.462753811058},"findings":[],"refEndingValue":56023.71275381106,"refXirr":0.1147257983716764},"GLOBAL_6040":{"capture":{"available":12445.911719031319,"kept":14190.25,"forgone":-1744.338280968681,"pctKept":1.1401535154954838,"pctForgone":-0.1401535154954839,"feeShare":0,"otherShare":0},"findings":[{"id":"outperformed","severity":"info","title":"Your strategy beat the passive reference","detail":"Over this period you finished ahead of the reference strategy. Worth checking whether that came with more risk, and remembering that a few years is a short sample."}],"refEndingValue":51945.91171903132,"refXirr":0.08957667779124023},"TARGET_2060":{"capture":{"available":18959.31290304494,"kept":14190.25,"forgone":4769.062903044942,"pctKept":0.7484580307612829,"pctForgone":0.251541969238717,"feeShare":0,"otherShare":4769.062903044942},"findings":[],"refEndingValue":58459.31290304494,"refXirr":0.1289750892728222},"US_TOTAL":{"capture":{"available":21409.980371671118,"kept":14190.25,"forgone":7219.730371671118,"pctKept":0.6627866889021536,"pctForgone":0.3372133110978464,"feeShare":0,"otherShare":7219.730371671118},"findings":[],"refEndingValue":60909.98037167112,"refXirr":0.14278662396201425},"US_500":{"capture":{"available":22902.77396527137,"kept":14190.25,"forgone":8712.523965271372,"pctKept":0.6195865191490512,"pctForgone":0.3804134808509489,"feeShare":0,"otherShare":8712.523965271372},"findings":[],"refEndingValue":62402.77396527137,"refXirr":0.150958554071552},"ALL_BONDS":{"capture":{"available":1506.4761752839186,"kept":14190.25,"forgone":-12683.773824716081,"pctKept":9.419498451295208,"pctForgone":-8.419498451295208,"feeShare":0,"otherShare":0},"findings":[{"id":"outperformed","severity":"info","title":"Your strategy beat the passive reference","detail":"Over this period you finished ahead of the reference strategy. Worth checking whether that came with more risk, and remembering that a few years is a short sample."}],"refEndingValue":41006.47617528392,"refXirr":0.012101365453677349}}},"strategies":[{"id":"GLOBAL_EQUITY","label":"Global stock market","explainer":"Every listed company in the world, weighted by size. The simplest possible 'do nothing' portfolio and the fairest yardstick for a stock-heavy strategy.","caution":null,"requiresAfter":null,"endingValue":60328.401081907454,"xirr":0.13955446880793432,"expenseRatio":{"extra":0,"embedded":0.0006,"allIn":0.0006,"source":"catalogue"}},{"id":"GLOBAL_8020","label":"Global 80/20","explainer":"Global stocks with a fifth in bonds. A common setting for someone decades from retirement who still wants some cushion.","caution":null,"requiresAfter":null,"endingValue":56023.71275381106,"xirr":0.1147257983716764,"expenseRatio":{"extra":0,"embedded":0.0005399999999999999,"allIn":0.0005399999999999999,"source":"catalogue"}},{"id":"GLOBAL_6040","label":"Global 60/40","explainer":"The classic balanced portfolio. Lower highs and shallower lows.","caution":null,"requiresAfter":null,"endingValue":51945.91171903132,"xirr":0.08957667779124023,"expenseRatio":{"extra":0,"embedded":0.00047999999999999996,"allIn":0.00047999999999999996,"source":"catalogue"}},{"id":"TARGET_2060","label":"Target-date 2060 fund","explainer":"One fund that holds global stocks and bonds and gets more conservative as you age. What most 401k plans use as a default.","caution":"These returns are Vanguard’s 2060 fund at 0.08% a year. In a 401k you get whichever 2060 fund the plan offers, and that one can cost several times more — enter its expense ratio to compare against what was on your menu.","requiresAfter":2012,"endingValue":58459.31290304494,"xirr":0.1289750892728222,"expenseRatio":{"extra":0,"embedded":0.0008,"allIn":0.0008,"source":"catalogue"}},{"id":"US_TOTAL","label":"US stock market","explainer":"Every US-listed company, weighted by size.","caution":"US stocks beat global stocks over the last decade. Nobody knew that in advance, and the reverse has happened in other decades. Treat this as context, not as a standard your strategy should have met.","requiresAfter":null,"endingValue":60909.98037167112,"xirr":0.14278662396201425,"expenseRatio":{"extra":0,"embedded":0.0003,"allIn":0.0003,"source":"catalogue"}},{"id":"US_500","label":"S&P 500","explainer":"The 500 largest US companies.","caution":"This is the single most hindsight-prone comparison available. US large caps had an exceptional run; picking them in advance would have been a concentrated bet, not prudence. Shown for context only.","requiresAfter":null,"endingValue":62402.77396527137,"xirr":0.150958554071552,"expenseRatio":{"extra":0,"embedded":0.0003,"allIn":0.0003,"source":"catalogue"}},{"id":"ALL_BONDS","label":"All bonds","explainer":"The whole US investment-grade bond market. Useful as a floor reference.","caution":null,"requiresAfter":null,"endingValue":41006.47617528392,"xirr":0.012101365453677349,"expenseRatio":{"extra":0,"embedded":0.0003,"allIn":0.0003,"source":"catalogue"}}],"meta":{"historyStart":"2021-10-12","historyEnd":"2026-07-31","endingValue":53690.25,"netContributed":39500,"grossContributed":50875,"grossWithdrawn":11375,"openingPosition":0,"gain":14190.25,"yourXirr":0.10054387101873885,"defaultReferenceId":"GLOBAL_EQUITY","feePctEntered":0.0085,"dataQuality":{"balanceCount":27,"observedMonths":27,"spanMonths":58,"coverage":0.46551724137931033,"largestGapMonths":8,"flowCount":13,"balanceBeforeFirstFlow":null,"granularity":"quarterly","firstDate":"2021-10-12","lastDate":"2026-07-31","warnings":["Balances cover 27 of the 58 months in this period — about one every 2 months, and the longest stretch without one runs 8 months. Between observations your value is drawn as a straight line rather than observed, and each period's return is estimated from your contribution dates rather than measured directly. Month-end balances would sharpen both.","2021 covers 61 days (2021-10-31 to 2021-12-31), not a full year. Its return is the plain return over those 61 days, not annualised, so it should not be read alongside the full years as if it were one. If the account existed before 2021-10-31, adding an earlier balance would make it a full year.","2026 covers 212 days (2025-12-31 to 2026-07-31), not a full year. Its return is the plain return over those 212 days, not annualised, so it should not be read alongside the full years as if it were one. It fills in as the year completes."]}}};
+
+/* ── formatting ─────────────────────────────────────────────────────────── */
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const nf = (v, dp) => v.toLocaleString('en-US', { minimumFractionDigits: dp || 0, maximumFractionDigits: dp || 0 });
+const usd  = v => (v < 0 ? '−' : '') + '$' + nf(Math.round(Math.abs(v)));
+const usd2 = v => (v < 0 ? '−' : '') + '$' + nf(Math.abs(v), 2);
+const monthOf = key => { const p = key.split('-'); return MON[+p[1] - 1] + ' ' + p[0]; };
+/* One decimal, always, and never rounded to a rounder number than the engine
+   gave. 5.9% is 5.9%, not "about 6". */
+const pct1 = f => (f * 100).toFixed(1) + '%';
+const pctFee = f => (f * 100).toFixed(2).replace(/\.?0+$/, '') + '%';
+const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+const NS = 'http://www.w3.org/2000/svg';
+function S(tag, attrs, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) if (attrs[k] !== null && attrs[k] !== undefined) e.setAttribute(k, attrs[k]);
+  if (text !== null && text !== undefined) e.textContent = text;
+  return e;
+}
+
+const byId = new Map(D.strategies.map(s => [s.id, s]));
+const START = monthOf(D.meta.historyStart);
+const END   = monthOf(D.meta.historyEnd);
+const INVESTED = D.meta.netContributed + D.meta.openingPosition;
+
+/* ── state ──────────────────────────────────────────────────────────────
+   Two of them, and both are inputs to the maths rather than views of it:
+   which reference the available gain is measured against, and what fee was
+   entered. Switching either one re-reads a different precomputed run. */
+let refId = D.meta.defaultReferenceId;
+let feeKey = 'feeAsEntered';
+const feePct = () => (feeKey === 'fee0' ? 0 : D.meta.feePctEntered);
+const scen = (r, f) => D.scenarios[f || feeKey][r || refId];
+
+/* ── availability ───────────────────────────────────────────────────────
+   A strategy whose fund did not exist for the whole of the user's history is
+   disabled with its reason on show, never hidden. Nothing in this fixture is
+   blocked — the history starts 2021-10 and every series covers it — but the
+   path exists because the engine's catalogue carries `requiresAfter`. */
+const startYear = +D.meta.historyStart.slice(0, 4);
+function eraBlock(s) {
+  if (s.requiresAfter != null && startYear <= s.requiresAfter) {
+    return 'Unavailable for your history. This fund did not exist before ' + s.requiresAfter +
+      ', and your history starts in ' + startYear + '.';
+  }
+  return null;
+}
+
+/* ── the segments ───────────────────────────────────────────────────────
+   This is the only place the shape of the bar is decided, and it is the part
+   of the page most likely to lie, so it is written as one function with every
+   branch visible.
+
+   NORMAL: the bar is the AVAILABLE gain, split into what was kept and what
+   was given up, with the fee separated out of the given-up part.
+
+   OUTPERFORMED (forgone <= 0): the bar is what YOU made, which is now the
+   larger number, split at the point the reference reached. There is no
+   "given up" segment at all — not a zero-width one, not a hairline. The
+   engine also zeroes feeShare and otherShare in this case, so there is
+   nothing to attribute and nothing is invented.
+
+   A segment with a value of exactly 0 is never emitted. That is what keeps a
+   fee of 0 — valid, common, and the setting most users of a self-managed
+   account will have — from rendering as a 0-pixel artefact between two other
+   fills. */
+function segments() {
+  const c = scen().capture;
+  const out = { total: 0, segs: [], mode: 'normal', capture: c };
+  const ref = byId.get(refId);
+
+  if (c.forgone <= 0) {
+    out.mode = 'ahead';
+    out.total = c.kept;
+    if (c.available > 0) {
+      out.segs.push({
+        key: 'matched', name: 'matched the reference', value: c.available,
+        fill: 'var(--cap-kept)', on: 'var(--ink)',
+        explain: 'The whole of the gain that was available in ' + ref.label +
+          ' over these months. You captured all of it.'
+      });
+    }
+    out.segs.push({
+      key: 'ahead', name: 'ahead of it', value: -c.forgone,
+      fill: 'var(--cap-ahead)', on: 'var(--cream)',
+      explain: 'Gain beyond what ' + ref.label + ' would have produced on the same money. ' +
+        'It is after everything you actually paid, including the fee.'
+    });
+    return out;
+  }
+
+  out.total = c.available;
+  if (c.kept > 0) {
+    out.segs.push({
+      key: 'kept', name: 'gain you kept', value: c.kept,
+      fill: 'var(--cap-kept)', on: 'var(--ink)',
+      explain: 'Your ending value less the money you put in. Your own deposits are not in this figure.'
+    });
+  }
+  if (c.feeShare > 0) {
+    out.segs.push({
+      key: 'fee', name: 'the fee', value: c.feeShare,
+      fill: 'var(--cap-fee)', on: 'var(--cream)',
+      explain: 'What a fee of ' + pctFee(feePct()) + ' a year cost this account, estimated by re-running your own ' +
+        'cash flows at a return that much higher. It is charged in every market, whatever happens.'
+    });
+  }
+  if (c.otherShare > 0) {
+    out.segs.push({
+      key: 'other', name: 'everything else', value: c.otherShare,
+      fill: 'var(--cap-other)', on: 'var(--ink)',
+      explain: 'The rest of the gap: allocation, fund selection, security choice, timing. The tool reaches ' +
+        'it by subtraction, not by measurement, so it is a residual and not an accusation.'
+    });
+  }
+  return out;
+}
+
+/* ── copy ───────────────────────────────────────────────────────────────
+   Both of these blocks are RESERVED height (see reserve()), so their wording
+   may change with the state without moving anything under them. */
+function claimHTML(r, f) {
+  const c = D.scenarios[f][r].capture;
+  const s = byId.get(r);
+  const good = D.scenarios[f][r].findings.find(x => x.id === 'outperformed');
+  let line, sub;
+
+  if (c.forgone <= 0) {
+    /* SPEC non-negotiable 3. The good news leads, in the same slot the bad
+       news would occupy, in the same size, and before any number about what
+       was given up — because there is nothing given up to report. */
+    line = 'You finished <b>' + usd(-c.forgone) + '</b> ahead of ' + esc(s.label) + '.';
+    sub = 'Your money made <b>' + usd2(c.kept) + '</b> over this period, on ' + usd(INVESTED) +
+      ' of net contributions. The same contributions and withdrawals in ' + esc(s.label) +
+      ' would have made ' + (c.available > 0 ? '<b>' + usd2(c.available) + '</b>' : 'nothing at all') +
+      '. Nothing was given up.';
+  } else {
+    line = 'You gave up <b>' + usd(c.forgone) + '</b> of the available gain.';
+    sub = 'Your money made <b>' + usd2(c.kept) + '</b> over this period, on ' + usd(INVESTED) +
+      ' of net contributions. The same contributions and withdrawals in ' + esc(s.label) +
+      ' would have made <b>' + usd2(c.available) + '</b>. You kept <b>' + pct1(c.pctKept) + '</b> of it.';
+  }
+  let html = '<p class="claim-line">' + line + '</p><p class="claim-sub">' + sub + '</p>';
+  if (good) {
+    /* SPEC non-negotiable 3 again: the engine's own wording for the good news,
+       verbatim, in the claim block rather than in a note below the fold. */
+    html += '<p class="claim-good"><b>' + esc(good.title) + '</b>' + esc(good.detail) + '</p>';
+  } else if (c.feeShare > 0) {
+    html += '<p class="claim-good is-plain">Of that, <b>' + usd2(c.feeShare) + '</b> is estimated to be your fee — ' +
+      pct1(c.feeShare / c.forgone) + ' of the gap. The remaining <b>' + usd2(c.otherShare) + '</b>, ' +
+      pct1(c.otherShare / c.forgone) + ' of it, is everything else the strategy did: allocation, fund ' +
+      'selection, security choice, timing.</p>';
+  } else {
+    html += '<p class="claim-good is-plain">No fee was entered, so none of this is attributed to one. All <b>' +
+      usd2(c.forgone) + '</b> of it sits with the strategy: allocation, fund selection, security choice, timing.</p>';
+  }
+  return html;
+}
+
+function underHTML(r, f) {
+  const c = D.scenarios[f][r].capture;
+  const s = byId.get(r);
+  const feeTxt = f === 'fee0'
+    ? 'No fee entered, so none of this is attributed to one.'
+    : 'Fee entered: ' + pctFee(D.meta.feePctEntered) + ' a year.';
+  if (c.forgone <= 0) {
+    return 'The bar is <b>' + usd2(c.kept) + '</b> — your gain: ending value ' + usd2(D.meta.endingValue) +
+      ' less ' + usd2(INVESTED) + ' of net contributions. The mark inside it is ' + usd2(Math.max(c.available, 0)) +
+      ', the gain available in ' + esc(s.label) + ' on the same money over the same months. ' + feeTxt;
+  }
+  return 'The bar is <b>' + usd2(c.available) + '</b> — the available gain: ' + esc(s.label) +
+    ' would have ended at ' + usd2(D.scenarios[f][r].refEndingValue) + ' on the same money, less ' + usd2(INVESTED) +
+    ' of net contributions. Your own deposits are not in it. ' + feeTxt;
+}
+
+/* Reserve the tallest wording this block can ever take AT THIS WIDTH, then
+   pin the block to it. Fourteen states, measured, not guessed. Re-run on
+   resize and after the fonts land, because both change text height. */
+function reserve(el, variants) {
+  const keep = el.innerHTML;
+  el.style.minHeight = '0px';
+  let max = 0;
+  for (const html of variants) {
+    el.innerHTML = html;
+    max = Math.max(max, el.getBoundingClientRect().height);
+  }
+  el.innerHTML = keep;
+  el.style.minHeight = Math.ceil(max) + 'px';
+}
+const ALL_STATES = [];
+for (const f of ['feeAsEntered', 'fee0']) for (const s of D.strategies) ALL_STATES.push([s.id, f]);
+
+function reserveAll() {
+  reserve(document.getElementById('claim'), ALL_STATES.map(([r, f]) => claimHTML(r, f)));
+  reserve(document.getElementById('under'), ALL_STATES.map(([r, f]) => underHTML(r, f)));
+}
+
+/* ── one popover, used twice — V1's, unchanged ──────────────────────────── */
+let popOpen = null, popTimer = null;
+function closePop() {
+  if (!popOpen) return;
+  popOpen.panel.hidden = true;
+  popOpen.btn.setAttribute('aria-expanded', 'false');
+  const row = popOpen.btn.closest('.ref');
+  if (row) row.removeAttribute('data-pop');
+  popOpen = null;
+}
+function showPop(btn, panel, pinned) {
+  if (popOpen && popOpen.btn === btn) { popOpen.pinned = popOpen.pinned || !!pinned; return; }
+  closePop();
+  panel.hidden = false;
+  btn.setAttribute('aria-expanded', 'true');
+  popOpen = { btn: btn, panel: panel, pinned: !!pinned };
+  const row = btn.closest('.ref');
+  if (row) {
+    row.setAttribute('data-pop', panel.classList.contains('is-caution') ? 'caution' : 'open');
+    const rr = row.getBoundingClientRect(), br = btn.getBoundingClientRect();
+    panel.style.setProperty('--notch-x', (br.left - rr.left + br.width / 2) + 'px');
+  }
+  const pr = panel.getBoundingClientRect();
+  if (pr.bottom > window.innerHeight - 8) panel.scrollIntoView({ block: 'nearest' });
+}
+function schedulePopClose() {
+  clearTimeout(popTimer);
+  popTimer = setTimeout(function () { if (popOpen && !popOpen.pinned) closePop(); }, 160);
+}
+function popIcon(kind) {
+  const svg = S('svg', { viewBox: '0 0 14 14', width: 14, height: 14, 'aria-hidden': 'true' });
+  if (kind === 'caution') {
+    svg.appendChild(S('path', { d: 'M7 1.4 L13.1 12.4 L0.9 12.4 Z', fill: 'none', stroke: 'currentColor', 'stroke-width': 1.4, 'stroke-linejoin': 'round' }));
+    svg.appendChild(S('line', { x1: 7, y1: 5.6, x2: 7, y2: 8.9, stroke: 'currentColor', 'stroke-width': 1.4, 'stroke-linecap': 'round' }));
+    svg.appendChild(S('circle', { cx: 7, cy: 10.6, r: 0.85, fill: 'currentColor' }));
+  } else {
+    svg.appendChild(S('circle', { cx: 7, cy: 7, r: 6, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.4 }));
+    svg.appendChild(S('circle', { cx: 7, cy: 4.1, r: 0.85, fill: 'currentColor' }));
+    svg.appendChild(S('line', { x1: 7, y1: 6.3, x2: 7, y2: 10.4, stroke: 'currentColor', 'stroke-width': 1.4, 'stroke-linecap': 'round' }));
+  }
+  return svg;
+}
+function popButton(kind, label, panelId) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'ref-pop-btn' + (kind === 'caution' ? ' is-caution' : '');
+  b.setAttribute('aria-expanded', 'false');
+  b.setAttribute('aria-controls', panelId);
+  b.setAttribute('aria-label', label);
+  b.appendChild(popIcon(kind));
+  const panel = function () { return document.getElementById(panelId); };
+  b.addEventListener('click', function () {
+    if (popOpen && popOpen.btn === b && popOpen.pinned) closePop();
+    else showPop(b, panel(), true);
+  });
+  b.addEventListener('pointerenter', function (e) {
+    if (e.pointerType !== 'mouse') return;
+    clearTimeout(popTimer);
+    showPop(b, panel(), false);
+  });
+  b.addEventListener('pointerleave', schedulePopClose);
+  return b;
+}
+function popPanel(id, cls, head, text) {
+  const p = document.createElement('div');
+  p.className = cls; p.id = id; p.hidden = true;
+  if (head) {
+    p.setAttribute('role', 'note');
+    const b = document.createElement('b'); b.textContent = head; p.appendChild(b);
+  }
+  const t = document.createElement('span'); t.textContent = text; p.appendChild(t);
+  p.addEventListener('pointerenter', function () { clearTimeout(popTimer); });
+  p.addEventListener('pointerleave', schedulePopClose);
+  return p;
+}
+document.addEventListener('click', function (e) {
+  if (!popOpen) return;
+  if (e.target.closest && (e.target.closest('.ref-pop') || e.target.closest('.ref-pop-btn'))) return;
+  closePop();
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape' || !popOpen) return;
+  const b = popOpen.btn; closePop(); b.focus();
+});
+
+/* ── the picker ─────────────────────────────────────────────────────────── */
+const refEls = new Map();
+function buildRow(host, opts) {
+  const li = document.createElement('li');
+  li.className = 'ref';
+  const line = document.createElement('div');
+  line.className = 'ref-line';
+
+  const lab = document.createElement('label');
+  lab.className = 'ref-label';
+  const box = document.createElement('input');
+  box.type = 'radio';
+  box.name = opts.group;
+  box.id = opts.id;
+  if (opts.blocked) { box.disabled = true; box.setAttribute('aria-describedby', opts.id + '-why'); }
+  box.addEventListener('change', opts.onChange);
+  lab.appendChild(box);
+  const span = document.createElement('span');
+  span.textContent = opts.label;
+  lab.appendChild(span);
+  line.appendChild(lab);
+
+  const tools = document.createElement('div');
+  tools.className = 'ref-tools';
+  if (opts.caution) {
+    const pid = opts.id + '-caution';
+    tools.appendChild(popButton('caution', 'Caution on ' + opts.label, pid));
+    li.appendChild(popPanel(pid, 'ref-pop is-caution', 'Caution', opts.caution));
+  }
+  if (opts.explainer) {
+    const pid = opts.id + '-info';
+    tools.appendChild(popButton('info', 'What ' + opts.label + ' is', pid));
+    li.appendChild(popPanel(pid, 'ref-pop', null, opts.explainer));
+  }
+  line.appendChild(tools);
+  li.insertBefore(line, li.firstChild);
+
+  if (opts.meta) {
+    const m = document.createElement('p');
+    m.className = 'ref-meta';
+    m.textContent = opts.meta;
+    li.appendChild(m);
+  }
+  if (opts.blocked) {
+    const why = document.createElement('p');
+    why.className = 'ref-reason';
+    why.id = opts.id + '-why';
+    why.textContent = opts.blocked;
+    li.appendChild(why);
+  }
+  host.appendChild(li);
+  return { li: li, box: box };
+}
+
+(function buildPicker() {
+  const host = document.getElementById('refs');
+  D.strategies.forEach(function (s) {
+    const blocked = eraBlock(s);
+    const el = buildRow(host, {
+      group: 'reference', id: 'ref-' + s.id, label: s.label,
+      explainer: s.explainer, caution: s.caution, blocked: blocked,
+      meta: 'ends at ' + usd(s.endingValue) + ' · fund cost ' + pctFee(s.expenseRatio.allIn) + '/yr',
+      onChange: function () { if (!blocked) { refId = s.id; update(true); } }
+    });
+    refEls.set(s.id, el);
+  });
+
+  const fhost = document.getElementById('fees');
+  [['feeAsEntered', pctFee(D.meta.feePctEntered) + ' a year — as entered', 'fee-entered'],
+   ['fee0', 'No fee — 0%', 'fee-zero']].forEach(function (f) {
+    const el = buildRow(fhost, {
+      group: 'fee', id: f[2], label: f[1],
+      onChange: function () { feeKey = f[0]; update(true); }
+    });
+    refEls.set(f[0], el);
+  });
+})();
+
+function paintRefs() {
+  D.strategies.forEach(function (s) {
+    const el = refEls.get(s.id);
+    el.box.checked = (s.id === refId);
+    el.li.setAttribute('data-state', el.box.disabled ? 'blocked' : (el.box.checked ? 'on' : 'off'));
+  });
+  ['feeAsEntered', 'fee0'].forEach(function (k) {
+    const el = refEls.get(k);
+    el.box.checked = (k === feeKey);
+    el.li.setAttribute('data-state', el.box.checked ? 'on' : 'off');
+  });
+}
+
+/* ── cautions — SPEC non-negotiable 4, rendered for as long as the strategy
+   is the reference, and never dismissable because there is no control here to
+   dismiss it with ────────────────────────────────────────────────────────── */
+function paintCautions() {
+  const host = document.getElementById('cautions');
+  host.textContent = '';
+  const s = byId.get(refId);
+  if (!s.caution) return;
+  const box = document.createElement('div');
+  box.className = 'caution-strip';
+  box.appendChild(popIcon('caution'));
+  const txt = document.createElement('p');
+  txt.style.margin = '0';
+  const b = document.createElement('b');
+  b.textContent = s.label + ' — ';
+  txt.appendChild(b);
+  txt.appendChild(document.createTextNode(s.caution));
+  box.appendChild(txt);
+  host.appendChild(box);
+}
+
+/* ── the note under the picker: the engine's findings, verbatim ─────────── */
+function paintNote() {
+  const host = document.getElementById('note');
+  host.textContent = '';
+  const c = scen().capture;
+  const bits = [];
+
+  const fm = scen().findings.find(x => x.id === 'fee-minority');
+  if (fm) bits.push('<b>' + esc(fm.title) + '.</b> ' + esc(fm.detail));
+
+  if (c.forgone > 0 && c.feeShare > 0) {
+    bits.push('The two given-up parts are not the same kind of claim. The fee is charged in every market, ' +
+      'whatever happens, and its size was known in advance. Everything else was a bet that could have gone ' +
+      'the other way — and against ' + esc(byId.get(refId).label) + ', over these months, it did not.');
+  }
+  if (c.forgone > 0 && c.feeShare === 0 && feeKey === 'fee0') {
+    bits.push('<b>No fee was entered</b>, so the bar shows two parts rather than an empty third one. The tool ' +
+      'attributes nothing to a fee it has not been told about.');
+  }
+  if (c.feeShare > 0) {
+    bits.push('The fee figure does not change when you change the reference. It is a property of your own cash ' +
+      'flows and the fee you entered — the engine re-runs your XIRR ' + pctFee(feePct()) +
+      ' higher and takes the difference in ending value — so it is an estimate of a cost, not a reading off a ' +
+      'fee schedule. What changes with the reference is how much of the gap it accounts for.');
+  }
+  if (c.forgone <= 0 && feePct() > 0) {
+    bits.push('You are ahead <b>after</b> everything you actually paid, including the fee of ' + pctFee(feePct()) +
+      ' a year: the ' + usd2(c.kept) + ' is your real ending value less your real contributions. The engine ' +
+      'attributes nothing to the fee here, because there is no gap for it to explain — not because the fee ' +
+      'was free.');
+  }
+
+  bits.forEach(function (t) {
+    const p = document.createElement('p');
+    p.innerHTML = t;
+    host.appendChild(p);
+  });
+  host.setAttribute('data-kind', scen().findings.some(x => x.id === 'outperformed') ? 'on' : 'off');
+}
+
+/* ── the honest meta line ───────────────────────────────────────────────── */
+function paintFoot() {
+  const foot = document.getElementById('chart-foot');
+  foot.textContent = '';
+  const c = scen().capture;
+  const s = byId.get(refId);
+  const bits = [
+    START + ' – ' + END,
+    'contributions stripped out: ' + usd2(INVESTED) + ' net in, from ' + D.meta.dataQuality.flowCount + ' recorded flows',
+    'your ending value ' + usd2(D.meta.endingValue),
+    'reference: ' + s.label + ', same money in and out, same months, ending ' + usd2(scen().refEndingValue),
+    feeKey === 'fee0' ? 'fee input: 0% — nothing attributed to a fee'
+                      : 'fee input: ' + pctFee(D.meta.feePctEntered) + ' a year, as entered',
+    c.forgone > 0 ? 'given up ' + usd2(c.forgone) + ' of ' + usd2(c.available) + ' available'
+                  : 'ahead of the reference by ' + usd2(-c.forgone) + ' — nothing given up',
+    'reference fund cost ' + pctFee(s.expenseRatio.allIn) + '/yr is already inside its path',
+    'granularity: ' + D.meta.dataQuality.granularity
+  ];
+  bits.forEach(function (t, i) {
+    const sp = document.createElement('span');
+    sp.textContent = (i ? '· ' : '') + t;
+    foot.appendChild(sp);
+  });
+}
+
+/* ── data notes — the engine's warnings verbatim, plus the two this visual
+   owes the reader about how its own figures were reached ─────────────────── */
+(function buildWarnings() {
+  const warnings = (D.meta.dataQuality.warnings || []).slice();
+  warnings.unshift('The fee share is an estimate, not a statement. The engine re-runs your own contributions and ' +
+    'withdrawals at an internal rate of return the size of your fee higher and takes the difference in ending ' +
+    'value. It is the right order of magnitude for what the fee cost this account; it is not a fee schedule and ' +
+    'it is not what any particular provider charged.');
+  warnings.push('&ldquo;Everything else&rdquo; is a residual. It is what remains after the fee estimate is taken ' +
+    'out of the gap, so it carries allocation, fund selection, security choice and timing together — and any ' +
+    'error in the fee estimate lands in it too. It is not attributed to anything in particular, and this tool ' +
+    'does not claim to know which of those it was.');
+  if (D.meta.dataQuality.balanceCount < 3) {
+    warnings.unshift('Only ' + D.meta.dataQuality.balanceCount + ' balance rows.');
+  }
+  const btn = document.getElementById('dq-toggle');
+  const panel = document.getElementById('dq-panel');
+  if (!warnings.length) { btn.remove(); panel.remove(); return; }
+  btn.hidden = false;
+  document.getElementById('dq-count').textContent = warnings.length;
+  btn.setAttribute('aria-label', warnings.length + ' notes on how precise this data is');
+
+  const head = document.createElement('p');
+  head.className = 'label';
+  head.textContent = 'How precise this is';
+  panel.appendChild(head);
+  const lead = document.createElement('p');
+  lead.className = 'dq-note';
+  lead.textContent = 'Your balances are ' + D.meta.dataQuality.granularity + '. ' +
+    'The three notes about the data below come from the engine that computed these figures, unedited.';
+  panel.appendChild(lead);
+  warnings.forEach(function (w) {
+    const p = document.createElement('p');
+    p.className = 'dq-note';
+    p.innerHTML = w;
+    panel.appendChild(p);
+  });
+  btn.addEventListener('click', function () {
+    const open = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', String(!open));
+    panel.hidden = open;
+  });
+})();
+
+/* ── the bar ────────────────────────────────────────────────────────────
+   Fixed height at every state and every width. The bar is the plot area and
+   the plot area does not move, so a caution appearing, a claim getting longer
+   or a note growing cannot shift it — and nothing below it is aimed at. */
+/* Two geometries, and which one is used depends on the WIDTH and on nothing
+   else. That is deliberate: if the choice depended on the label text — on how
+   long "everything else" is against "ahead of it" — then changing the
+   reference could change the height of the plot, and the plot would move.
+   Width only changes on a resize, which re-renders everything anyway. */
+const GEO_WIDE = {
+  capY: 11,          /* bracket caption baseline */
+  brkY: 22,          /* bracket rule, ticks 22 -> 28 */
+  top: 38, h: 70,    /* the bar itself: 38 .. 108 */
+  leadTo: 116,       /* leader line drops to here */
+  nameY: 128,        /* every segment's name sits on this line, all aligned */
+  outY: 146,         /* value + share for a segment too narrow to hold them */
+  botY: 164, botCapY: 179,
+  H: 186, stack: false
+};
+/* Under ~430px three labels cannot share a line without touching, and a
+   figure moved out of a 20px-wide segment has nowhere to go. So the labels
+   become a stacked legend under the bar — swatch, name, and the figures
+   right-aligned in a column — and nothing is written inside the segments at
+   all. Three rows are always reserved even when only two are used, so the
+   height is the same whatever is on the bar. */
+const GEO_NARROW = {
+  capY: 11, brkY: 22, top: 38, h: 70,
+  rowY: 126, rowStep: 19, rows: 3,
+  botY: 190, botCapY: 205,
+  H: 212, stack: true
+};
+let GEO = GEO_WIDE;
+const STACK_UNDER = 430;
+const GAP = 2;       /* surface showing between segments */
+let lastSegs = [];   /* hit regions for the tooltip, in svg px */
+let swap = false;
+
+function textW(svg, cls, str, size) {
+  const t = S('text', { class: cls, x: -9999, y: -9999 }, str);
+  if (size) t.setAttribute('font-size', size);
+  svg.appendChild(t);
+  const w = t.getComputedTextLength();
+  t.remove();
+  return w;
+}
+
+function render() {
+  const host = document.getElementById('plot');
+  const old = host.querySelector('svg');
+  if (old) old.remove();
+  const W = Math.max(240, host.clientWidth);
+  GEO = (W < STACK_UNDER) ? GEO_NARROW : GEO_WIDE;
+  const svg = S('svg', {
+    class: 'bar' + (swap ? ' is-swap' : ''), width: W, height: GEO.H,
+    viewBox: '0 0 ' + W + ' ' + GEO.H, role: 'img', 'aria-labelledby': 'bar-title bar-desc'
+  });
+  host.appendChild(svg);
+
+  const model = segments();
+  const total = model.total;
+  const segs = model.segs;
+
+  /* the surface the fills are drawn on — this is what buys terracotta and
+     dusty-blue their 3:1, and it is the brand's own way to lift a panel */
+  svg.appendChild(S('rect', { x: 0, y: GEO.top, width: W, height: GEO.h, fill: 'var(--plot-surface)' }));
+
+  if (total <= 0 || !segs.length) {
+    svg.appendChild(S('text', { class: 'seg-name', x: 0, y: GEO.top + 40 },
+      'No gain to divide over this period.'));
+    lastSegs = [];
+    return;
+  }
+
+  /* exact boundaries first, gaps taken out of the drawn rect afterwards, so
+     no segment's share is distorted by the gap between it and its neighbour */
+  let acc = 0;
+  const laid = segs.map(function (s, i) {
+    const x0 = W * (acc / total);
+    acc += s.value;
+    const x1 = W * (acc / total);
+    return {
+      s: s, x0: x0, x1: x1, cx: (x0 + x1) / 2,
+      dx: x0 + (i === 0 ? 0 : GAP / 2),
+      dw: Math.max(0, (x1 - x0) - (i === 0 ? GAP / 2 : GAP / 2) - (i === segs.length - 1 ? 0 : GAP / 2)),
+      share: s.value / total
+    };
+  });
+  lastSegs = laid;
+
+  laid.forEach(function (L) {
+    svg.appendChild(S('rect', { x: L.dx, y: GEO.top, width: L.dw, height: GEO.h, fill: L.s.fill }));
+  });
+
+  /* ── labels.
+     Wide: the dollar value goes inside the segment when the segment can hold
+     it with air around it; otherwise it drops to the line below. The NAME is
+     always outside and always on one shared baseline, so the names read as a
+     row rather than as three different treatments. Narrow: a stacked legend
+     instead, because three labels cannot share 300px.
+     Nothing is ever dropped for want of room and no figure is rounded away to
+     make one fit. */
+  const SWATCH = 13;
+
+  if (GEO.stack) {
+    laid.forEach(function (L, i) {
+      const y = GEO.rowY + i * GEO.rowStep;
+      svg.appendChild(S('rect', { x: 0, y: y - 9, width: 9, height: 9, fill: L.s.fill }));
+      svg.appendChild(S('text', { class: 'seg-name', x: SWATCH, y: y }, L.s.name.toUpperCase()));
+      const t = S('text', { class: 'seg-value is-out', x: W, y: y + 1, 'text-anchor': 'end' });
+      t.appendChild(S('tspan', null, usd(L.s.value)));
+      t.appendChild(S('tspan', { class: 'seg-pct is-out', dx: 7 }, '· ' + pct1(L.share)));
+      svg.appendChild(t);
+    });
+  } else {
+    /* the label's extent is the swatch plus the gap plus the words — measuring
+       only the words is how two labels end up touching at 640px */
+    const names = laid.map(function (L) {
+      const w = SWATCH + textW(svg, 'seg-name', L.s.name.toUpperCase());
+      return { L: L, w: w, x: 0 };
+    });
+    names.forEach(function (N) { N.x = Math.max(0, Math.min(W - N.w, N.L.cx - N.w / 2)); });
+    for (let i = 1; i < names.length; i++) {
+      const prev = names[i - 1];
+      if (names[i].x < prev.x + prev.w + 14) names[i].x = prev.x + prev.w + 14;
+    }
+    for (let i = names.length - 1; i >= 0; i--) {
+      const limit = (i === names.length - 1) ? W : names[i + 1].x - 14;
+      if (names[i].x + names[i].w > limit) names[i].x = Math.max(0, limit - names[i].w);
+    }
+
+    names.forEach(function (N) {
+      const L = N.L;
+      const valStr = usd(L.s.value);
+      const pctStr = pct1(L.share);
+      const vw = textW(svg, 'seg-value', valStr);
+      const pw = textW(svg, 'seg-pct', pctStr);
+      const inside = L.dw >= Math.max(vw, pw) + 26;
+
+      if (inside) {
+        svg.appendChild(S('text', { class: 'seg-value', x: L.cx, y: GEO.top + 36, 'text-anchor': 'middle', fill: L.s.on }, valStr));
+        const p = S('text', { class: 'seg-pct', x: L.cx, y: GEO.top + 54, 'text-anchor': 'middle', fill: L.s.on }, pctStr);
+        p.setAttribute('opacity', L.s.on === 'var(--cream)' ? '0.86' : '0.72');
+        svg.appendChild(p);
+      }
+
+      const nameCx = N.x + N.w / 2;
+      /* leader: straight down where the label did not have to move, an elbow
+         where it did. Dotted, in the rule colour — it is furniture. */
+      const pts = (Math.abs(nameCx - L.cx) < 0.6)
+        ? [[L.cx, GEO.top + GEO.h], [L.cx, GEO.leadTo]]
+        : [[L.cx, GEO.top + GEO.h], [L.cx, GEO.top + GEO.h + 5], [nameCx, GEO.top + GEO.h + 5], [nameCx, GEO.leadTo]];
+      svg.appendChild(S('polyline', {
+        points: pts.map(p => p.join(',')).join(' '), fill: 'none',
+        stroke: 'var(--line)', 'stroke-width': 1, 'stroke-dasharray': '1.5 3'
+      }));
+      svg.appendChild(S('rect', { x: N.x, y: GEO.nameY - 9, width: 9, height: 9, fill: L.s.fill }));
+      svg.appendChild(S('text', { class: 'seg-name', x: N.x + SWATCH, y: GEO.nameY }, L.s.name.toUpperCase()));
+
+      if (!inside) {
+        const t = S('text', { class: 'seg-value is-out', x: N.x + SWATCH, y: GEO.outY });
+        t.appendChild(S('tspan', null, valStr));
+        const sp = S('tspan', { class: 'seg-pct is-out', dx: 7 }, '· ' + pctStr);
+        t.appendChild(sp);
+        svg.appendChild(t);
+      }
+    });
+  }
+
+  /* ── the bracket over the part the headline is about ──────────────────── */
+  const brkKeys = model.mode === 'ahead' ? ['ahead'] : ['fee', 'other'];
+  const brk = laid.filter(L => brkKeys.indexOf(L.s.key) >= 0);
+  if (brk.length) {
+    const bx0 = brk[0].x0, bx1 = brk[brk.length - 1].x1;
+    const c = model.capture;
+    const full = model.mode === 'ahead'
+      ? 'Ahead · ' + usd(-c.forgone) + ' more than ' + byId.get(refId).label + ' made'
+      : 'Given up · ' + usd(c.forgone) + ' · ' + pct1(c.pctForgone) + ' of the available gain';
+    const short = model.mode === 'ahead'
+      ? 'Ahead · ' + usd(-c.forgone)
+      : 'Given up · ' + usd(c.forgone) + ' · ' + pct1(c.pctForgone);
+    let cap = full;
+    if (textW(svg, 'brk-cap', full.toUpperCase()) > W - 4) cap = short;
+    const cw = textW(svg, 'brk-cap', cap.toUpperCase());
+    const cxc = Math.max(cw / 2 + 1, Math.min(W - cw / 2 - 1, (bx0 + bx1) / 2));
+    svg.appendChild(S('text', { class: 'brk-cap', x: cxc, y: GEO.capY, 'text-anchor': 'middle' }, cap.toUpperCase()));
+    svg.appendChild(S('path', {
+      d: 'M' + bx0 + ' ' + (GEO.brkY + 6) + ' L' + bx0 + ' ' + GEO.brkY + ' L' + bx1 + ' ' + GEO.brkY + ' L' + bx1 + ' ' + (GEO.brkY + 6),
+      fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1.5
+    }));
+  }
+
+  /* ── the whole bar, named underneath: the denominator every percentage on
+     this page is a percentage of ────────────────────────────────────────── */
+  const botFull = (model.mode === 'ahead'
+    ? usd(total) + ' · your gain, contributions excluded'
+    : usd(total) + ' · available gain, contributions excluded').toUpperCase();
+  const botShort = (model.mode === 'ahead'
+    ? usd(total) + ' · your gain'
+    : usd(total) + ' · available gain').toUpperCase();
+  const botCap = (textW(svg, 'brk-cap', botFull) > W - 4) ? botShort : botFull;
+  svg.appendChild(S('path', {
+    d: 'M0 ' + (GEO.botY - 6) + ' L0 ' + GEO.botY + ' L' + W + ' ' + GEO.botY + ' L' + W + ' ' + (GEO.botY - 6),
+    fill: 'none', stroke: 'var(--line)', 'stroke-width': 1.5
+  }));
+  const bw = textW(svg, 'brk-cap', botCap);
+  svg.appendChild(S('text', {
+    class: 'brk-cap is-quiet', x: Math.max(bw / 2, Math.min(W - bw / 2, W / 2)), y: GEO.botCapY, 'text-anchor': 'middle'
+  }, botCap));
+
+  wireTip(svg, W);
+}
+
+/* ── tooltip ────────────────────────────────────────────────────────────
+   Hover only, exactly as V1's crosshair is. The segments are DATA, not
+   controls: their position is the information, so they move when the
+   reference changes and they are therefore not focusable — a focus target
+   that moves is the defect this page's audit exists to catch. Everything the
+   tooltip says is also in the table view, which is keyboard-reachable, and in
+   the description read to a screen reader. */
+const tip = document.getElementById('tip');
+function hideTip() { tip.setAttribute('data-show', '0'); }
+function wireTip(svg, W) {
+  svg.addEventListener('pointermove', function (e) {
+    const r = svg.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    if (y < GEO.top || y > GEO.top + GEO.h) { hideTip(); return; }
+    const hit = lastSegs.find(L => x >= L.x0 && x <= L.x1);
+    if (!hit) { hideTip(); return; }
+    const c = scen().capture;
+    let share = '<div class="tip-share">' + pct1(hit.share) + ' of ' + usd(segments().total) + '</div>';
+    if (hit.s.key === 'fee' || hit.s.key === 'other') {
+      share += '<div class="tip-share">' + pct1(hit.s.value / c.forgone) + ' of what you gave up</div>';
+    }
+    tip.innerHTML =
+      '<div class="tip-head"><span class="tip-key" style="background:' + hit.s.fill + '"></span>' +
+      '<span class="tip-name">' + esc(hit.s.name) + '</span></div>' +
+      '<div class="tip-val">' + usd2(hit.s.value) + '</div>' + share +
+      '<div class="tip-note">' + esc(hit.s.explain) + '</div>';
+    tip.setAttribute('data-show', '1');
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    /* below the bar, never over it: the one thing that must stay visible while
+       you point at it is the thing you are pointing at. It overflows the plot
+       wrapper downwards, which costs the layout nothing — the wrapper is
+       position:relative and the tip is out of flow. */
+    tip.style.transform = 'translate(' +
+      Math.max(0, Math.min(W - tw, x - tw / 2)) + 'px,' +
+      (GEO.top + GEO.h + 12) + 'px)';
+  });
+  svg.addEventListener('pointerleave', hideTip);
+}
+
+/* ── table view — every figure in the bar, without a pointer ────────────── */
+function buildTable() {
+  const head = document.getElementById('table-head');
+  const body = document.getElementById('table-body');
+  head.textContent = ''; body.textContent = '';
+  const c = scen().capture;
+  const s = byId.get(refId);
+  const model = segments();
+
+  /* The fourth column only exists where it means something. In the
+     outperformed state there is no "what you gave up" to take a share of. */
+  const cols = ['', 'Amount', 'Share of the bar'];
+  if (model.mode !== 'ahead') cols.push('Share of what you gave up');
+  cols.forEach(function (t) {
+    const th = document.createElement('th');
+    th.setAttribute('scope', 'col');
+    th.textContent = t;
+    head.appendChild(th);
+  });
+
+  let rows;
+  if (model.mode === 'ahead') {
+    /* The bar is YOUR gain here, so "share of the bar" is a share of that —
+       not of the available gain. capture.pctKept is 941.9% against All bonds,
+       which is arithmetically right and reads like a typo, so it is stated
+       once at the bottom as a multiple instead of used as a column. */
+    rows = [
+      ['Your ending value', usd2(D.meta.endingValue), null, null, ''],
+      ['Money you put in, net of withdrawals', '−' + usd2(INVESTED), null, null, ''],
+      ['Gain you kept — the whole bar', usd2(c.kept), '100%', null, 'is-total'],
+      [s.label + ' would have ended at', usd2(scen().refEndingValue), null, null, ''],
+      ['The same money in, net of withdrawals', '−' + usd2(INVESTED), null, null, ''],
+      ['Available gain in ' + s.label, usd2(c.available),
+       c.kept > 0 ? pct1(Math.max(c.available, 0) / c.kept) : '—', null, ''],
+      ['Ahead of it', usd2(-c.forgone), c.kept > 0 ? pct1(-c.forgone / c.kept) : '—', null, 'is-total']
+    ];
+    if (c.available > 0) {
+      rows.push(['Your gain as a multiple of the reference\u2019s',
+                 (c.kept / c.available).toFixed(1) + '×', null, null, '']);
+    }
+  } else {
+    rows = [
+      ['Your ending value', usd2(D.meta.endingValue), null, null, ''],
+      ['Money you put in, net of withdrawals', '−' + usd2(INVESTED), null, null, ''],
+      ['Gain you kept', usd2(c.kept), c.available > 0 ? pct1(c.pctKept) : '—', null, 'is-total'],
+      [s.label + ' would have ended at', usd2(scen().refEndingValue), null, null, ''],
+      ['The same money in, net of withdrawals', '−' + usd2(INVESTED), null, null, ''],
+      ['Available gain — the whole bar', usd2(c.available), '100%', null, 'is-total'],
+      ['Given up', usd2(c.forgone), pct1(c.pctForgone), '100%', 'is-total']
+    ];
+    if (c.feeShare > 0) rows.push(['the fee', usd2(c.feeShare), pct1(c.feeShare / c.available), pct1(c.feeShare / c.forgone), 'is-sub']);
+    else rows.push(['the fee — none entered', usd2(0), '—', '—', 'is-sub']);
+    rows.push(['everything else', usd2(c.otherShare), pct1(c.otherShare / c.available), pct1(c.otherShare / c.forgone), 'is-sub']);
+  }
+
+  rows.forEach(function (r) {
+    const tr = document.createElement('tr');
+    if (r[4]) tr.className = r[4];
+    const th = document.createElement('th');
+    th.setAttribute('scope', 'row');
+    th.textContent = r[0];
+    tr.appendChild(th);
+    const vals = (model.mode === 'ahead') ? [r[1], r[2]] : [r[1], r[2], r[3]];
+    vals.forEach(function (v) {
+      const td = document.createElement('td');
+      if (v === null || v === undefined) { td.textContent = '—'; td.className = 'is-empty'; }
+      else td.textContent = v;
+      tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+
+  document.getElementById('table-caption').textContent =
+    'How the bar is arrived at, ' + START + ' to ' + END + ', measured against ' + s.label +
+    ', with a fee input of ' + pctFee(feePct()) + ' a year.';
+
+  const key = document.getElementById('table-key-list');
+  key.textContent = '';
+  model.segs.forEach(function (sg) {
+    const dt = document.createElement('dt');
+    const i = document.createElement('i');
+    i.style.background = sg.fill;
+    dt.appendChild(i);
+    dt.appendChild(document.createTextNode(sg.name + ' — ' + usd2(sg.value)));
+    const dd = document.createElement('dd');
+    dd.textContent = sg.explain;
+    key.appendChild(dt); key.appendChild(dd);
+  });
+}
+
+(function wireTable() {
+  const btn = document.getElementById('table-toggle');
+  const view = document.getElementById('table-view');
+  btn.addEventListener('click', function () {
+    const on = btn.getAttribute('aria-pressed') === 'true';
+    btn.setAttribute('aria-pressed', String(!on));
+    view.hidden = on;
+  });
+})();
+
+/* ── the whole comparison, in prose, for anyone not looking at it ───────── */
+function paintDesc() {
+  const c = scen().capture;
+  const s = byId.get(refId);
+  let t = 'A single horizontal bar dividing the investment gain available between ' + START + ' and ' + END +
+    ', measured against ' + s.label + '. Your own contributions are excluded from every figure: ' +
+    usd2(INVESTED) + ' net was paid in, and your account ended at ' + usd2(D.meta.endingValue) + '. ';
+  if (c.forgone <= 0) {
+    t += 'You finished ahead. Your gain of ' + usd2(c.kept) + ' is ' + usd2(-c.forgone) + ' more than the ' +
+      usd2(Math.max(c.available, 0)) + ' the same contributions and withdrawals would have produced in ' +
+      s.label + ' over the same months. The bar is your gain, in two parts: the part that matches what the ' +
+      'reference made, and the part beyond it. There is no given-up segment, because nothing was given up. ' +
+      'This is after everything you actually paid, including a fee of ' + pctFee(feePct()) + ' a year.';
+  } else {
+    t += 'Of ' + usd2(c.available) + ' available, you kept ' + usd2(c.kept) + ', which is ' + pct1(c.pctKept) +
+      ', and gave up ' + usd2(c.forgone) + ', which is ' + pct1(c.pctForgone) + '. ';
+    if (c.feeShare > 0) {
+      t += 'The bar has three parts. Of what was given up, ' + usd2(c.feeShare) + ' — ' +
+        pct1(c.feeShare / c.forgone) + ' of it — is estimated to come from a fee of ' + pctFee(feePct()) +
+        ' a year, and ' + usd2(c.otherShare) + ' — ' + pct1(c.otherShare / c.forgone) +
+        ' — from everything else: allocation, fund selection, security choice and timing, reached by ' +
+        'subtraction rather than measured.';
+    } else {
+      t += 'The bar has two parts, not three: no fee was entered, so nothing is attributed to one and the ' +
+        'whole of the gap sits in everything else — allocation, fund selection, security choice and timing.';
+    }
+  }
+  t += ' This is a historical comparison against a passive strategy on the same cash flows. It does not mean ' +
+    'that strategy was available in your plan.';
+  document.getElementById('bar-desc').textContent = t;
+}
+
+/* ── one update path for every state change ─────────────────────────────── */
+function update(announce) {
+  paintRefs();
+  document.getElementById('claim').innerHTML = claimHTML(refId, feeKey);
+  document.getElementById('under').innerHTML = underHTML(refId, feeKey);
+  paintCautions();
+  paintNote();
+  paintFoot();
+  paintDesc();
+  buildTable();
+  hideTip();
+  swap = !!announce;
+  render();
+  swap = false;
+  if (announce) {
+    const c = scen().capture;
+    const s = byId.get(refId);
+    document.getElementById('sel-live').textContent = (c.forgone <= 0
+      ? 'Measured against ' + s.label + ' with a fee of ' + pctFee(feePct()) + ': you finished ' +
+        usd(-c.forgone) + ' ahead. Nothing was given up.'
+      : 'Measured against ' + s.label + ' with a fee of ' + pctFee(feePct()) + ': you kept ' + usd(c.kept) +
+        ', ' + pct1(c.pctKept) + ' of the ' + usd(c.available) + ' available, and gave up ' + usd(c.forgone) + '.') +
+      (s.caution ? ' This reference carries a caution.' : '');
+  }
+}
+
+reserveAll();
+update(false);
+
+let rt;
+window.addEventListener('resize', function () {
+  clearTimeout(rt);
+  rt = setTimeout(function () { reserveAll(); update(false); }, 120);
+});
+
+/* The reserved heights and the label collision pass are both measured from
+   rendered text, so both are wrong until the real font arrives. Redo them
+   when it does rather than shipping a layout sized in Georgia. */
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(function () { reserveAll(); update(false); });
+}
+
+/* the font axes are load-bearing; prove they arrived rather than eyeballing */
+(async function proveFraunces() {
+  const probe = settings => {
+    const s = document.createElement('span');
+    s.style.cssText = 'position:absolute;visibility:hidden;font-family:Fraunces;' +
+      'font-size:120px;font-weight:300;font-variation-settings:' + settings;
+    s.textContent = 'flourish';
+    document.body.appendChild(s);
+    const w = s.getBoundingClientRect().width;
+    s.remove();
+    return w;
+  };
+  if (!document.fonts) return;
+  await document.fonts.ready;
+  const loaded = document.fonts.check('300 48px Fraunces');
+  const axes = probe("'WONK' 1, 'SOFT' 100") !== probe("'WONK' 0, 'SOFT' 0");
+  window.__fraunces = { loaded: loaded, axes: axes };
+  if (!loaded || !axes) console.warn('Fraunces axes missing', { loaded, axes });
+})();
+</script>
+</body>
+</html>

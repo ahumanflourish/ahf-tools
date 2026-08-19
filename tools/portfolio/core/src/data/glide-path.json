@@ -1,0 +1,1618 @@
+{
+ "meta": {
+  "version": "1.0.0",
+  "generated": "2026-08-19",
+  "what": "Vanguard's published Target Retirement glide path, as a series of DATED cross-sections. Each schedule is the whole fund ladder as the issuer stated it on one date: for every fund, the share of the portfolio in equities and the US share of that equity, against t = years from the as-of date to 1 January of the fund's target year. Interpolating across t within a schedule, and stepping between schedules as calendar time advances, gives an allocation for ANY retirement year in ANY month. This is the input to a CONSTRUCTED target-date reference series; it is not itself return data.",
+  "issuer": "The Vanguard Group — Vanguard Target Retirement Funds, Vanguard Chester Funds, SEC CIK 0000752177.",
+  "units": "`equity` and `usEquityShare` are percent. `t` is years, positive before the target year, negative after.",
+  "coverage": "Schedules as of 2007-01-29 through 2025-09-30, one per annual prospectus.",
+  "notes": [
+   "WHY THIS IS SOURCEABLE AND A CURVE FIT IS NOT. A glide path is published by the issuer, in a filed prospectus, as numbers. Every point in this file was read out of an SEC filing and every schedule names the accession number it came from. Nothing here was fitted to returns. That is the distinction benchmarks.json's own notes draw when they record a constructed pre-2008 GLOBAL_EQUITY that was built, measured, and NOT shipped because its anchor weight was a least-squares fit to VT that could not be sourced anywhere. If a future refresh cannot source a schedule, it must not invent one.",
+   "TWO DISCLOSURE BASES. Schedules through 2019-09-30 are `holdings`: the prospectus's 'the Fund's asset allocation among the underlying funds was' block, which is the actual portfolio on the fiscal year end and therefore sits within the rebalancing band of the target rather than exactly on it. Schedules from 2020-09-30 are `composite`: the 'portion allocations' Vanguard states its own composite benchmark index is derived from, which IS the target schedule. Where both were disclosed the two agree to well under a percentage point. `composite` is preferred wherever it exists.",
+   "THE GLIDE PATH HAS CHANGED, AND THE CHANGES ARE IN THIS FILE. The US share of the equity sleeve was 80% through the 2009-09-30 schedule, 70% from 2011-01-26 through 2014-09-30, and 60% from 2015-09-30 onward — Vanguard raised international equity from 20% to 30% of equity in 2010 and from 30% to 40% in 2015. Applying today's path to 2008 would be an anachronism, so the constructed series steps between schedules as calendar time advances and uses the schedule that was in force. The shape of the equity glide moved too: on the 2025-09-30 schedule equity falls 1.5 percentage points a year from 90% at roughly 25 years before the target year, reaching about 53% at the target year and about 30% seven years after it.",
+   "THE INCOME POINT IS PLACED AT t = -7 ON THE ISSUER'S OWN WORDS. Vanguard Target Retirement Income Fund has no target year; every dated fund's prospectus says 'Within seven years after [target year], the Fund's asset allocation should become similar to that of Vanguard Target Retirement Income Fund.' So the Income allocation is entered as the schedule's terminal point at t = -7 and held for all t below it.",
+   "FOUR SLEEVES ARE COLLAPSED INTO TWO NUMBERS. The real funds hold US equity, international equity, US investment-grade bonds, USD-hedged international bonds, short-term TIPS and (before 2013) a money-market sleeve. This file records only the equity share and the US share of equity, because benchmarks.json carries no TIPS series, no international-bond series and no usable cash series — everything that is not equity is mapped to BOND_TOTAL. That approximation is measured, not assumed: see the reconciliation in data-tools/glide_reconcile.mjs. It costs almost nothing on a long-dated fund, which is nearly all equity, and grows as the target year approaches and the TIPS and hedged-bond sleeves get large.",
+   "BEFORE 2007-01-29 THERE IS NO SCHEDULE AND THE FIRST ONE IS REUSED. Vanguard's Target Retirement funds launched 2003-10-27; the earliest annual prospectus this file could parse an allocation out of is the 485BPOS filed 2007-01-29. Months before that date use the 2007-01-29 schedule. INTL_TOTAL monthly data begins 2004-01, so the affected window is 2004-01 to 2007-01 — three years in which the modelled US share of equity is held at the 80% the 2007 filing states, which is the same 80% the 2007-09-30 and 2008-09-30 filings state, so the extrapolation is flat rather than adventurous. It is still an extrapolation and is labelled as one.",
+   "2012 IS ABSENT AND THAT IS DELIBERATE. The 485BPOS filed 2012-01-25 uses a sentence form the parser could only read for two of the twelve funds, so no 2012 schedule was written rather than a partial one. The 2011-01-26 and 2012-09-30 schedules bracket the gap and agree on the 70% equity split, so nothing is lost but a year of granularity.",
+   "REFRESH. One schedule per year, appended, when Vanguard files its January 485BPOS — the composite index portion allocations are in each fund's 'Annual Total Returns' preamble. Existing schedules never change: they are what the issuer said on a date that has passed. Cross-check a new schedule by re-running data-tools/glide_reconcile.mjs, which compounds the constructed series against the issuer's own published calendar-year returns for the whole fund ladder.",
+   "CITATION URLS CARRY NO SCHEME, DELIBERATELY. This file is inlined whole into the offline HTML build and the artifact payload, and those two targets are gated by a static check that fails on an absolute web URL anywhere in the emitted bytes - scheme, colon, slash, slash. That check is coarse on purpose: it cannot tell a citation from a CDN script tag, and the project's sourcing history says the coarse version is the one to keep. So the citation of record is the SEC accession number, which is exact and permanent, and `url` is the EDGAR path with the scheme left for the reader to prefix. This note is written the long way round for the same reason."
+  ]
+ },
+ "sources": [
+  {
+   "asOf": "2007-01-29",
+   "form": "485BPOS",
+   "accession": "0000932471-07-000090",
+   "filed": "2007-01-29",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000093247107000090/chester485b012007.txt",
+   "field": "the Fund's asset allocation among the underlying funds"
+  },
+  {
+   "asOf": "2007-09-30",
+   "form": "485BPOS",
+   "accession": "0000932471-08-000022",
+   "filed": "2008-01-24",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000093247108000022/chester_485b.txt",
+   "field": "the Fund's asset allocation among the underlying funds"
+  },
+  {
+   "asOf": "2008-09-30",
+   "form": "485BPOS",
+   "accession": "0000932471-09-000067",
+   "filed": "2009-01-27",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000093247109000067/chesterfunds485b.txt",
+   "field": "the Fund's asset allocation among the underlying funds"
+  },
+  {
+   "asOf": "2009-09-30",
+   "form": "485BPOS",
+   "accession": "0000932471-10-000080",
+   "filed": "2010-01-25",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000093247110000080/chester485b.htm",
+   "field": "the Fund's asset allocation among the underlying funds"
+  },
+  {
+   "asOf": "2011-01-26",
+   "form": "485BPOS",
+   "accession": "0000932471-11-000082",
+   "filed": "2011-01-26",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000093247111000082/chester_485b.htm",
+   "field": "the Fund's asset allocation among the underlying funds"
+  },
+  {
+   "asOf": "2012-09-30",
+   "form": "485BPOS",
+   "accession": "0000932471-13-000346",
+   "filed": "2013-01-28",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000093247113000346/chesterfunds485b012013.htm",
+   "field": "the Fund's asset allocation among the underlying funds"
+  },
+  {
+   "asOf": "2013-09-30",
+   "form": "485BPOS",
+   "accession": "0000932471-14-000519",
+   "filed": "2014-01-27",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000093247114000519/merged.htm",
+   "field": "the Fund's asset allocation among the underlying funds"
+  },
+  {
+   "asOf": "2014-09-30",
+   "form": "485BPOS",
+   "accession": "0000932471-15-000138",
+   "filed": "2015-01-26",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000093247115000138/mergedoc.htm",
+   "field": "the Fund's asset allocation among the underlying funds"
+  },
+  {
+   "asOf": "2015-09-30",
+   "form": "485BPOS",
+   "accession": "0000932471-16-009793",
+   "filed": "2016-01-28",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000093247116009793/chester485b.htm",
+   "field": "the Fund's asset allocation among the underlying funds"
+  },
+  {
+   "asOf": "2016-09-30",
+   "form": "485BPOS",
+   "accession": "0000932471-17-000194",
+   "filed": "2017-01-27",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000093247117000194/chester485b.htm",
+   "field": "the Fund's asset allocation among the underlying funds"
+  },
+  {
+   "asOf": "2017-09-30",
+   "form": "485BPOS",
+   "accession": "0000932471-18-000101",
+   "filed": "2018-01-25",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000093247118000101/chester485bmerge.htm",
+   "field": "the Fund's asset allocation among the underlying funds"
+  },
+  {
+   "asOf": "2018-09-30",
+   "form": "485BPOS",
+   "accession": "0000932471-19-001933",
+   "filed": "2019-01-28",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000093247119001933/chester485b2019.htm",
+   "field": "the Fund's asset allocation among the underlying funds"
+  },
+  {
+   "asOf": "2019-09-30",
+   "form": "485BPOS",
+   "accession": "0001683863-20-000191",
+   "filed": "2020-01-31",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000168386320000191/f2353d1.htm",
+   "field": "the Fund's asset allocation among the underlying funds"
+  },
+  {
+   "asOf": "2020-09-30",
+   "form": "485BPOS",
+   "accession": "0001683863-21-000307",
+   "filed": "2021-01-28",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000168386321000307/chester-20210131.htm",
+   "field": "composite index portion allocations (the target schedule Vanguard derives its own benchmark from)"
+  },
+  {
+   "asOf": "2021-09-30",
+   "form": "485BPOS",
+   "accession": "0001683863-22-000308",
+   "filed": "2022-01-31",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000168386322000308/f10750d0.htm",
+   "field": "composite index portion allocations (the target schedule Vanguard derives its own benchmark from)"
+  },
+  {
+   "asOf": "2022-09-30",
+   "form": "485BPOS",
+   "accession": "0001683863-23-000516",
+   "filed": "2023-01-31",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000168386323000516/f24163d0.htm",
+   "field": "composite index portion allocations (the target schedule Vanguard derives its own benchmark from)"
+  },
+  {
+   "asOf": "2023-09-30",
+   "form": "485BPOS",
+   "accession": "0001683863-24-000385",
+   "filed": "2024-01-31",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000168386324000385/f37381d0.htm",
+   "field": "composite index portion allocations (the target schedule Vanguard derives its own benchmark from)"
+  },
+  {
+   "asOf": "2024-09-30",
+   "form": "485BPOS",
+   "accession": "0001683863-25-000459",
+   "filed": "2025-01-31",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000168386325000459/f40563d0.htm",
+   "field": "composite index portion allocations (the target schedule Vanguard derives its own benchmark from)"
+  },
+  {
+   "asOf": "2025-09-30",
+   "form": "485BPOS",
+   "accession": "0001193125-26-024962",
+   "filed": "2026-01-28",
+   "url": "www.sec.gov/Archives/edgar/data/752177/000119312526024962/f43837d1.htm",
+   "field": "composite index portion allocations (the target schedule Vanguard derives its own benchmark from)"
+  }
+ ],
+ "schedules": [
+  {
+   "asOf": "2007-01-29",
+   "basis": "holdings",
+   "source": 0,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 30.3,
+     "usEquityShare": 80.198,
+     "fund": "Income"
+    },
+    {
+     "t": 2.9233,
+     "equity": 58.0612,
+     "usEquityShare": 80.1406,
+     "fund": "2010"
+    },
+    {
+     "t": 7.9233,
+     "equity": 65.4,
+     "usEquityShare": 79.9694,
+     "fund": "2015"
+    },
+    {
+     "t": 12.9233,
+     "equity": 73.4,
+     "usEquityShare": 80.2452,
+     "fund": "2020"
+    },
+    {
+     "t": 17.9233,
+     "equity": 80.9,
+     "usEquityShare": 79.9753,
+     "fund": "2025"
+    },
+    {
+     "t": 22.9233,
+     "equity": 88.3,
+     "usEquityShare": 80.2945,
+     "fund": "2030"
+    },
+    {
+     "t": 27.9233,
+     "equity": 89.9,
+     "usEquityShare": 79.8665,
+     "fund": "2035"
+    },
+    {
+     "t": 32.9233,
+     "equity": 90.5,
+     "usEquityShare": 80.0,
+     "fund": "2040"
+    },
+    {
+     "t": 37.9233,
+     "equity": 89.9,
+     "usEquityShare": 79.8665,
+     "fund": "2045"
+    },
+    {
+     "t": 42.9233,
+     "equity": 89.8,
+     "usEquityShare": 79.8441,
+     "fund": "2050"
+    }
+   ]
+  },
+  {
+   "asOf": "2007-09-30",
+   "basis": "holdings",
+   "source": 1,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 30.4,
+     "usEquityShare": 79.2763,
+     "fund": "Income"
+    },
+    {
+     "t": -2.7452,
+     "equity": 44.4,
+     "usEquityShare": 79.0541,
+     "fund": "2005"
+    },
+    {
+     "t": 2.2548,
+     "equity": 54.8,
+     "usEquityShare": 79.3796,
+     "fund": "2010"
+    },
+    {
+     "t": 7.2548,
+     "equity": 63.6,
+     "usEquityShare": 79.717,
+     "fund": "2015"
+    },
+    {
+     "t": 12.2548,
+     "equity": 71.5,
+     "usEquityShare": 79.4406,
+     "fund": "2020"
+    },
+    {
+     "t": 17.2548,
+     "equity": 79.1,
+     "usEquityShare": 79.7724,
+     "fund": "2025"
+    },
+    {
+     "t": 22.2548,
+     "equity": 86.7,
+     "usEquityShare": 79.8155,
+     "fund": "2030"
+    },
+    {
+     "t": 27.2548,
+     "equity": 90.0,
+     "usEquityShare": 79.7778,
+     "fund": "2035"
+    },
+    {
+     "t": 32.2548,
+     "equity": 90.1,
+     "usEquityShare": 79.8002,
+     "fund": "2040"
+    },
+    {
+     "t": 37.2548,
+     "equity": 90.0,
+     "usEquityShare": 79.6667,
+     "fund": "2045"
+    },
+    {
+     "t": 42.2548,
+     "equity": 90.1,
+     "usEquityShare": 79.6892,
+     "fund": "2050"
+    }
+   ]
+  },
+  {
+   "asOf": "2008-09-30",
+   "basis": "holdings",
+   "source": 2,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 29.8,
+     "usEquityShare": 81.2081,
+     "fund": "Income"
+    },
+    {
+     "t": -3.7459,
+     "equity": 41.6,
+     "usEquityShare": 80.2885,
+     "fund": "2005"
+    },
+    {
+     "t": 1.2541,
+     "equity": 54.0,
+     "usEquityShare": 80.3704,
+     "fund": "2010"
+    },
+    {
+     "t": 6.2541,
+     "equity": 62.9,
+     "usEquityShare": 80.2862,
+     "fund": "2015"
+    },
+    {
+     "t": 11.2541,
+     "equity": 70.5,
+     "usEquityShare": 80.1418,
+     "fund": "2020"
+    },
+    {
+     "t": 16.2541,
+     "equity": 77.9,
+     "usEquityShare": 80.2311,
+     "fund": "2025"
+    },
+    {
+     "t": 21.2541,
+     "equity": 85.5,
+     "usEquityShare": 80.117,
+     "fund": "2030"
+    },
+    {
+     "t": 26.2541,
+     "equity": 90.0,
+     "usEquityShare": 80.2222,
+     "fund": "2035"
+    },
+    {
+     "t": 31.2541,
+     "equity": 89.9,
+     "usEquityShare": 80.2002,
+     "fund": "2040"
+    },
+    {
+     "t": 36.2541,
+     "equity": 89.9,
+     "usEquityShare": 80.2002,
+     "fund": "2045"
+    },
+    {
+     "t": 41.2541,
+     "equity": 89.8,
+     "usEquityShare": 80.1782,
+     "fund": "2050"
+    }
+   ]
+  },
+  {
+   "asOf": "2009-09-30",
+   "basis": "holdings",
+   "source": 3,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 29.9,
+     "usEquityShare": 79.9331,
+     "fund": "Income"
+    },
+    {
+     "t": -4.7452,
+     "equity": 37.8,
+     "usEquityShare": 79.8942,
+     "fund": "2005"
+    },
+    {
+     "t": 0.2548,
+     "equity": 51.4,
+     "usEquityShare": 79.9611,
+     "fund": "2010"
+    },
+    {
+     "t": 5.2548,
+     "equity": 61.0,
+     "usEquityShare": 79.8361,
+     "fund": "2015"
+    },
+    {
+     "t": 10.2548,
+     "equity": 68.5,
+     "usEquityShare": 80.0,
+     "fund": "2020"
+    },
+    {
+     "t": 15.2548,
+     "equity": 76.0,
+     "usEquityShare": 79.8684,
+     "fund": "2025"
+    },
+    {
+     "t": 20.2548,
+     "equity": 83.6,
+     "usEquityShare": 79.9043,
+     "fund": "2030"
+    },
+    {
+     "t": 25.2548,
+     "equity": 89.9,
+     "usEquityShare": 79.7553,
+     "fund": "2035"
+    },
+    {
+     "t": 30.2548,
+     "equity": 90.0,
+     "usEquityShare": 79.8889,
+     "fund": "2040"
+    },
+    {
+     "t": 35.2548,
+     "equity": 89.9,
+     "usEquityShare": 79.9778,
+     "fund": "2045"
+    },
+    {
+     "t": 40.2548,
+     "equity": 90.0,
+     "usEquityShare": 79.8889,
+     "fund": "2050"
+    }
+   ]
+  },
+  {
+   "asOf": "2011-01-26",
+   "basis": "holdings",
+   "source": 4,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 30.0,
+     "usEquityShare": 70.0,
+     "fund": "Income"
+    },
+    {
+     "t": -6.0685,
+     "equity": 36.0,
+     "usEquityShare": 69.4444,
+     "fund": "2005"
+    },
+    {
+     "t": -1.0685,
+     "equity": 50.0,
+     "usEquityShare": 70.0,
+     "fund": "2010"
+    },
+    {
+     "t": 3.9315,
+     "equity": 58.0,
+     "usEquityShare": 68.9655,
+     "fund": "2015"
+    },
+    {
+     "t": 8.9315,
+     "equity": 67.0,
+     "usEquityShare": 70.1493,
+     "fund": "2020"
+    },
+    {
+     "t": 13.9315,
+     "equity": 75.0,
+     "usEquityShare": 69.3333,
+     "fund": "2025"
+    },
+    {
+     "t": 18.9315,
+     "equity": 82.0,
+     "usEquityShare": 69.5122,
+     "fund": "2030"
+    },
+    {
+     "t": 23.9315,
+     "equity": 90.0,
+     "usEquityShare": 70.0,
+     "fund": "2035"
+    },
+    {
+     "t": 28.9315,
+     "equity": 90.0,
+     "usEquityShare": 70.0,
+     "fund": "2040"
+    },
+    {
+     "t": 33.9315,
+     "equity": 90.0,
+     "usEquityShare": 70.0,
+     "fund": "2045"
+    },
+    {
+     "t": 38.9315,
+     "equity": 90.0,
+     "usEquityShare": 70.0,
+     "fund": "2050"
+    },
+    {
+     "t": 43.9315,
+     "equity": 90.0,
+     "usEquityShare": 70.0,
+     "fund": "2055"
+    }
+   ]
+  },
+  {
+   "asOf": "2012-09-30",
+   "basis": "holdings",
+   "source": 5,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 30.0,
+     "usEquityShare": 69.6667,
+     "fund": "Income"
+    },
+    {
+     "t": -2.7459,
+     "equity": 43.3,
+     "usEquityShare": 69.515,
+     "fund": "2010"
+    },
+    {
+     "t": 2.2541,
+     "equity": 55.3,
+     "usEquityShare": 69.8011,
+     "fund": "2015"
+    },
+    {
+     "t": 7.2541,
+     "equity": 63.7,
+     "usEquityShare": 69.8587,
+     "fund": "2020"
+    },
+    {
+     "t": 12.2541,
+     "equity": 71.4,
+     "usEquityShare": 69.7479,
+     "fund": "2025"
+    },
+    {
+     "t": 17.2541,
+     "equity": 78.7,
+     "usEquityShare": 70.0127,
+     "fund": "2030"
+    },
+    {
+     "t": 22.2541,
+     "equity": 86.3,
+     "usEquityShare": 69.8725,
+     "fund": "2035"
+    },
+    {
+     "t": 27.2541,
+     "equity": 89.9,
+     "usEquityShare": 69.7442,
+     "fund": "2040"
+    },
+    {
+     "t": 32.2541,
+     "equity": 89.8,
+     "usEquityShare": 69.9332,
+     "fund": "2045"
+    },
+    {
+     "t": 37.2541,
+     "equity": 89.8,
+     "usEquityShare": 69.9332,
+     "fund": "2050"
+    },
+    {
+     "t": 42.2541,
+     "equity": 90.0,
+     "usEquityShare": 69.7778,
+     "fund": "2055"
+    }
+   ]
+  },
+  {
+   "asOf": "2013-09-30",
+   "basis": "holdings",
+   "source": 6,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 29.9,
+     "usEquityShare": 69.8997,
+     "fund": "Income"
+    },
+    {
+     "t": -3.7452,
+     "equity": 39.8,
+     "usEquityShare": 69.8492,
+     "fund": "2010"
+    },
+    {
+     "t": 1.2548,
+     "equity": 52.8,
+     "usEquityShare": 69.8864,
+     "fund": "2015"
+    },
+    {
+     "t": 6.2548,
+     "equity": 62.1,
+     "usEquityShare": 69.8873,
+     "fund": "2020"
+    },
+    {
+     "t": 11.2548,
+     "equity": 69.7,
+     "usEquityShare": 70.0143,
+     "fund": "2025"
+    },
+    {
+     "t": 16.2548,
+     "equity": 77.2,
+     "usEquityShare": 69.9482,
+     "fund": "2030"
+    },
+    {
+     "t": 21.2548,
+     "equity": 84.6,
+     "usEquityShare": 69.8582,
+     "fund": "2035"
+    },
+    {
+     "t": 26.2548,
+     "equity": 89.9,
+     "usEquityShare": 69.9666,
+     "fund": "2040"
+    },
+    {
+     "t": 31.2548,
+     "equity": 90.0,
+     "usEquityShare": 70.0,
+     "fund": "2045"
+    },
+    {
+     "t": 36.2548,
+     "equity": 90.0,
+     "usEquityShare": 70.0,
+     "fund": "2050"
+    },
+    {
+     "t": 41.2548,
+     "equity": 89.9,
+     "usEquityShare": 69.9666,
+     "fund": "2055"
+    },
+    {
+     "t": 46.2548,
+     "equity": 90.0,
+     "usEquityShare": 70.0,
+     "fund": "2060"
+    }
+   ]
+  },
+  {
+   "asOf": "2014-09-30",
+   "basis": "holdings",
+   "source": 7,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 29.9,
+     "usEquityShare": 70.5686,
+     "fund": "Income"
+    },
+    {
+     "t": -4.7452,
+     "equity": 37.3,
+     "usEquityShare": 71.0456,
+     "fund": "2010"
+    },
+    {
+     "t": 0.2548,
+     "equity": 51.0,
+     "usEquityShare": 71.1765,
+     "fund": "2015"
+    },
+    {
+     "t": 5.2548,
+     "equity": 60.7,
+     "usEquityShare": 70.8402,
+     "fund": "2020"
+    },
+    {
+     "t": 10.2548,
+     "equity": 68.0,
+     "usEquityShare": 70.5882,
+     "fund": "2025"
+    },
+    {
+     "t": 15.2548,
+     "equity": 75.6,
+     "usEquityShare": 70.5026,
+     "fund": "2030"
+    },
+    {
+     "t": 20.2548,
+     "equity": 83.2,
+     "usEquityShare": 70.3125,
+     "fund": "2035"
+    },
+    {
+     "t": 25.2548,
+     "equity": 90.0,
+     "usEquityShare": 70.2222,
+     "fund": "2040"
+    },
+    {
+     "t": 30.2548,
+     "equity": 90.0,
+     "usEquityShare": 70.2222,
+     "fund": "2045"
+    },
+    {
+     "t": 35.2548,
+     "equity": 89.9,
+     "usEquityShare": 70.0779,
+     "fund": "2050"
+    },
+    {
+     "t": 40.2548,
+     "equity": 90.0,
+     "usEquityShare": 70.0,
+     "fund": "2055"
+    },
+    {
+     "t": 45.2548,
+     "equity": 90.0,
+     "usEquityShare": 70.0,
+     "fund": "2060"
+    }
+   ]
+  },
+  {
+   "asOf": "2015-09-30",
+   "basis": "holdings",
+   "source": 8,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 29.8,
+     "usEquityShare": 61.0738,
+     "fund": "Income"
+    },
+    {
+     "t": -5.7452,
+     "equity": 34.5,
+     "usEquityShare": 60.5797,
+     "fund": "2010"
+    },
+    {
+     "t": -0.7452,
+     "equity": 48.7,
+     "usEquityShare": 60.1643,
+     "fund": "2015"
+    },
+    {
+     "t": 4.2548,
+     "equity": 59.4,
+     "usEquityShare": 60.2694,
+     "fund": "2020"
+    },
+    {
+     "t": 9.2548,
+     "equity": 66.8,
+     "usEquityShare": 60.0299,
+     "fund": "2025"
+    },
+    {
+     "t": 14.2548,
+     "equity": 74.4,
+     "usEquityShare": 59.9462,
+     "fund": "2030"
+    },
+    {
+     "t": 19.2548,
+     "equity": 81.9,
+     "usEquityShare": 60.0733,
+     "fund": "2035"
+    },
+    {
+     "t": 24.2548,
+     "equity": 89.3,
+     "usEquityShare": 60.0224,
+     "fund": "2040"
+    },
+    {
+     "t": 29.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2045"
+    },
+    {
+     "t": 34.2548,
+     "equity": 90.1,
+     "usEquityShare": 60.0444,
+     "fund": "2050"
+    },
+    {
+     "t": 39.2548,
+     "equity": 89.9,
+     "usEquityShare": 59.9555,
+     "fund": "2055"
+    },
+    {
+     "t": 44.2548,
+     "equity": 90.1,
+     "usEquityShare": 59.9334,
+     "fund": "2060"
+    }
+   ]
+  },
+  {
+   "asOf": "2016-09-30",
+   "basis": "holdings",
+   "source": 9,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 30.2,
+     "usEquityShare": 59.9338,
+     "fund": "Income"
+    },
+    {
+     "t": -6.7459,
+     "equity": 32.2,
+     "usEquityShare": 59.9379,
+     "fund": "2010"
+    },
+    {
+     "t": -1.7459,
+     "equity": 46.4,
+     "usEquityShare": 59.9138,
+     "fund": "2015"
+    },
+    {
+     "t": 3.2541,
+     "equity": 57.4,
+     "usEquityShare": 60.1045,
+     "fund": "2020"
+    },
+    {
+     "t": 8.2541,
+     "equity": 65.4,
+     "usEquityShare": 60.0917,
+     "fund": "2025"
+    },
+    {
+     "t": 13.2541,
+     "equity": 72.9,
+     "usEquityShare": 60.0823,
+     "fund": "2030"
+    },
+    {
+     "t": 18.2541,
+     "equity": 80.4,
+     "usEquityShare": 60.0746,
+     "fund": "2035"
+    },
+    {
+     "t": 23.2541,
+     "equity": 87.9,
+     "usEquityShare": 60.0683,
+     "fund": "2040"
+    },
+    {
+     "t": 28.2541,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2045"
+    },
+    {
+     "t": 33.2541,
+     "equity": 90.1,
+     "usEquityShare": 60.0444,
+     "fund": "2050"
+    },
+    {
+     "t": 38.2541,
+     "equity": 90.0,
+     "usEquityShare": 60.1111,
+     "fund": "2055"
+    },
+    {
+     "t": 43.2541,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2060"
+    }
+   ]
+  },
+  {
+   "asOf": "2017-09-30",
+   "basis": "holdings",
+   "source": 10,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 30.3,
+     "usEquityShare": 60.066,
+     "fund": "Income"
+    },
+    {
+     "t": -2.7452,
+     "equity": 43.6,
+     "usEquityShare": 59.633,
+     "fund": "2015"
+    },
+    {
+     "t": 2.2548,
+     "equity": 55.7,
+     "usEquityShare": 59.9641,
+     "fund": "2020"
+    },
+    {
+     "t": 7.2548,
+     "equity": 64.3,
+     "usEquityShare": 60.1866,
+     "fund": "2025"
+    },
+    {
+     "t": 12.2548,
+     "equity": 71.7,
+     "usEquityShare": 60.251,
+     "fund": "2030"
+    },
+    {
+     "t": 17.2548,
+     "equity": 79.0,
+     "usEquityShare": 60.2532,
+     "fund": "2035"
+    },
+    {
+     "t": 22.2548,
+     "equity": 86.5,
+     "usEquityShare": 60.1156,
+     "fund": "2040"
+    },
+    {
+     "t": 27.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.2222,
+     "fund": "2045"
+    },
+    {
+     "t": 32.2548,
+     "equity": 90.1,
+     "usEquityShare": 60.1554,
+     "fund": "2050"
+    },
+    {
+     "t": 37.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.1111,
+     "fund": "2055"
+    },
+    {
+     "t": 42.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.1111,
+     "fund": "2060"
+    },
+    {
+     "t": 47.2548,
+     "equity": 90.0,
+     "usEquityShare": 59.8889,
+     "fund": "2065"
+    }
+   ]
+  },
+  {
+   "asOf": "2018-09-30",
+   "basis": "holdings",
+   "source": 11,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 30.0,
+     "usEquityShare": 60.3333,
+     "fund": "Income"
+    },
+    {
+     "t": -3.7452,
+     "equity": 40.6,
+     "usEquityShare": 60.0985,
+     "fund": "2015"
+    },
+    {
+     "t": 1.2548,
+     "equity": 53.5,
+     "usEquityShare": 60.1869,
+     "fund": "2020"
+    },
+    {
+     "t": 6.2548,
+     "equity": 62.9,
+     "usEquityShare": 60.4134,
+     "fund": "2025"
+    },
+    {
+     "t": 11.2548,
+     "equity": 70.2,
+     "usEquityShare": 60.114,
+     "fund": "2030"
+    },
+    {
+     "t": 16.2548,
+     "equity": 77.7,
+     "usEquityShare": 60.2317,
+     "fund": "2035"
+    },
+    {
+     "t": 21.2548,
+     "equity": 85.0,
+     "usEquityShare": 60.1176,
+     "fund": "2040"
+    },
+    {
+     "t": 26.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.1111,
+     "fund": "2045"
+    },
+    {
+     "t": 31.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2050"
+    },
+    {
+     "t": 36.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2055"
+    },
+    {
+     "t": 41.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.1111,
+     "fund": "2060"
+    },
+    {
+     "t": 46.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.2222,
+     "fund": "2065"
+    }
+   ]
+  },
+  {
+   "asOf": "2019-09-30",
+   "basis": "holdings",
+   "source": 12,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 30.2,
+     "usEquityShare": 60.596,
+     "fund": "Income"
+    },
+    {
+     "t": -4.7452,
+     "equity": 37.9,
+     "usEquityShare": 59.8945,
+     "fund": "2015"
+    },
+    {
+     "t": 0.2548,
+     "equity": 51.5,
+     "usEquityShare": 60.0,
+     "fund": "2020"
+    },
+    {
+     "t": 5.2548,
+     "equity": 61.1,
+     "usEquityShare": 60.0655,
+     "fund": "2025"
+    },
+    {
+     "t": 10.2548,
+     "equity": 68.5,
+     "usEquityShare": 60.0,
+     "fund": "2030"
+    },
+    {
+     "t": 15.2548,
+     "equity": 76.1,
+     "usEquityShare": 60.184,
+     "fund": "2035"
+    },
+    {
+     "t": 20.2548,
+     "equity": 83.3,
+     "usEquityShare": 60.024,
+     "fund": "2040"
+    },
+    {
+     "t": 25.2548,
+     "equity": 89.8,
+     "usEquityShare": 60.0223,
+     "fund": "2045"
+    },
+    {
+     "t": 30.2548,
+     "equity": 89.8,
+     "usEquityShare": 60.0223,
+     "fund": "2050"
+    },
+    {
+     "t": 35.2548,
+     "equity": 89.8,
+     "usEquityShare": 60.0223,
+     "fund": "2055"
+    },
+    {
+     "t": 40.2548,
+     "equity": 89.9,
+     "usEquityShare": 60.178,
+     "fund": "2060"
+    },
+    {
+     "t": 45.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.1111,
+     "fund": "2065"
+    }
+   ]
+  },
+  {
+   "asOf": "2020-09-30",
+   "basis": "composite",
+   "source": 13,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 30.0,
+     "usEquityShare": 60.0,
+     "fund": "Income"
+    },
+    {
+     "t": -5.7459,
+     "equity": 30.0,
+     "usEquityShare": 60.0,
+     "fund": "2015"
+    },
+    {
+     "t": -0.7459,
+     "equity": 48.5485,
+     "usEquityShare": 60.0,
+     "fund": "2020"
+    },
+    {
+     "t": 4.2541,
+     "equity": 59.0,
+     "usEquityShare": 60.0,
+     "fund": "2025"
+    },
+    {
+     "t": 9.2541,
+     "equity": 66.7333,
+     "usEquityShare": 60.0299,
+     "fund": "2030"
+    },
+    {
+     "t": 14.2541,
+     "equity": 74.3,
+     "usEquityShare": 60.0269,
+     "fund": "2035"
+    },
+    {
+     "t": 19.2541,
+     "equity": 81.7183,
+     "usEquityShare": 60.0244,
+     "fund": "2040"
+    },
+    {
+     "t": 24.2541,
+     "equity": 89.3,
+     "usEquityShare": 60.0224,
+     "fund": "2045"
+    },
+    {
+     "t": 29.2541,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2050"
+    },
+    {
+     "t": 34.2541,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2055"
+    },
+    {
+     "t": 39.2541,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2060"
+    },
+    {
+     "t": 44.2541,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2065"
+    }
+   ]
+  },
+  {
+   "asOf": "2021-09-30",
+   "basis": "composite",
+   "source": 14,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 30.0,
+     "usEquityShare": 60.0,
+     "fund": "Income"
+    },
+    {
+     "t": -6.7452,
+     "equity": 31.6683,
+     "usEquityShare": 59.9369,
+     "fund": "2015"
+    },
+    {
+     "t": -1.7452,
+     "equity": 45.954,
+     "usEquityShare": 60.0,
+     "fund": "2020"
+    },
+    {
+     "t": 3.2548,
+     "equity": 57.1429,
+     "usEquityShare": 59.965,
+     "fund": "2025"
+    },
+    {
+     "t": 8.2548,
+     "equity": 65.4,
+     "usEquityShare": 59.9388,
+     "fund": "2030"
+    },
+    {
+     "t": 13.2548,
+     "equity": 72.9,
+     "usEquityShare": 59.9451,
+     "fund": "2035"
+    },
+    {
+     "t": 18.2548,
+     "equity": 80.4,
+     "usEquityShare": 59.9502,
+     "fund": "2040"
+    },
+    {
+     "t": 23.2548,
+     "equity": 87.9,
+     "usEquityShare": 59.9545,
+     "fund": "2045"
+    },
+    {
+     "t": 28.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2050"
+    },
+    {
+     "t": 33.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2055"
+    },
+    {
+     "t": 38.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2060"
+    },
+    {
+     "t": 43.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2065"
+    }
+   ]
+  },
+  {
+   "asOf": "2022-09-30",
+   "basis": "composite",
+   "source": 15,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 30.0,
+     "usEquityShare": 60.0,
+     "fund": "Income"
+    },
+    {
+     "t": -2.7452,
+     "equity": 43.3433,
+     "usEquityShare": 60.0462,
+     "fund": "2020"
+    },
+    {
+     "t": 2.2548,
+     "equity": 55.3,
+     "usEquityShare": 60.0362,
+     "fund": "2025"
+    },
+    {
+     "t": 7.2548,
+     "equity": 64.0,
+     "usEquityShare": 60.0,
+     "fund": "2030"
+    },
+    {
+     "t": 12.2548,
+     "equity": 71.4571,
+     "usEquityShare": 60.0559,
+     "fund": "2035"
+    },
+    {
+     "t": 17.2548,
+     "equity": 79.0,
+     "usEquityShare": 60.0,
+     "fund": "2040"
+    },
+    {
+     "t": 22.2548,
+     "equity": 86.4271,
+     "usEquityShare": 60.0462,
+     "fund": "2045"
+    },
+    {
+     "t": 27.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2050"
+    },
+    {
+     "t": 32.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2055"
+    },
+    {
+     "t": 37.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2060"
+    },
+    {
+     "t": 42.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2065"
+    }
+   ]
+  },
+  {
+   "asOf": "2023-09-30",
+   "basis": "composite",
+   "source": 16,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 30.0,
+     "usEquityShare": 60.0,
+     "fund": "Income"
+    },
+    {
+     "t": -3.7452,
+     "equity": 40.7,
+     "usEquityShare": 59.9509,
+     "fund": "2020"
+    },
+    {
+     "t": 1.2548,
+     "equity": 53.5,
+     "usEquityShare": 60.0,
+     "fund": "2025"
+    },
+    {
+     "t": 6.2548,
+     "equity": 62.6,
+     "usEquityShare": 60.0639,
+     "fund": "2030"
+    },
+    {
+     "t": 11.2548,
+     "equity": 70.1,
+     "usEquityShare": 60.0571,
+     "fund": "2035"
+    },
+    {
+     "t": 16.2548,
+     "equity": 77.6224,
+     "usEquityShare": 59.9743,
+     "fund": "2040"
+    },
+    {
+     "t": 21.2548,
+     "equity": 85.1149,
+     "usEquityShare": 59.9765,
+     "fund": "2045"
+    },
+    {
+     "t": 26.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2050"
+    },
+    {
+     "t": 31.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2055"
+    },
+    {
+     "t": 36.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2060"
+    },
+    {
+     "t": 41.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2065"
+    },
+    {
+     "t": 46.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2070"
+    }
+   ]
+  },
+  {
+   "asOf": "2024-09-30",
+   "basis": "composite",
+   "source": 17,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 30.0,
+     "usEquityShare": 60.0,
+     "fund": "Income"
+    },
+    {
+     "t": -4.7459,
+     "equity": 37.62,
+     "usEquityShare": 59.9947,
+     "fund": "2020"
+    },
+    {
+     "t": 5.2541,
+     "equity": 61.0,
+     "usEquityShare": 60.0,
+     "fund": "2030"
+    },
+    {
+     "t": 10.2541,
+     "equity": 68.5,
+     "usEquityShare": 60.0,
+     "fund": "2035"
+    },
+    {
+     "t": 15.2541,
+     "equity": 76.0,
+     "usEquityShare": 60.0,
+     "fund": "2040"
+    },
+    {
+     "t": 20.2541,
+     "equity": 83.5,
+     "usEquityShare": 60.0,
+     "fund": "2045"
+    },
+    {
+     "t": 25.2541,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2050"
+    },
+    {
+     "t": 30.2541,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2055"
+    },
+    {
+     "t": 45.2541,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2070"
+    }
+   ]
+  },
+  {
+   "asOf": "2025-09-30",
+   "basis": "composite",
+   "source": 18,
+   "points": [
+    {
+     "t": -7.0,
+     "equity": 30.0,
+     "usEquityShare": 60.0,
+     "fund": "Income"
+    },
+    {
+     "t": -5.7452,
+     "equity": 34.52,
+     "usEquityShare": 59.9942,
+     "fund": "2020"
+    },
+    {
+     "t": -0.7452,
+     "equity": 48.81,
+     "usEquityShare": 60.0082,
+     "fund": "2025"
+    },
+    {
+     "t": 4.2548,
+     "equity": 59.5631,
+     "usEquityShare": 59.9966,
+     "fund": "2030"
+    },
+    {
+     "t": 9.2548,
+     "equity": 66.8733,
+     "usEquityShare": 60.003,
+     "fund": "2035"
+    },
+    {
+     "t": 14.2548,
+     "equity": 74.3726,
+     "usEquityShare": 60.0027,
+     "fund": "2040"
+    },
+    {
+     "t": 19.2548,
+     "equity": 81.8718,
+     "usEquityShare": 60.0024,
+     "fund": "2045"
+    },
+    {
+     "t": 24.2548,
+     "equity": 89.3711,
+     "usEquityShare": 60.0022,
+     "fund": "2050"
+    },
+    {
+     "t": 29.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2055"
+    },
+    {
+     "t": 34.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2060"
+    },
+    {
+     "t": 39.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2065"
+    },
+    {
+     "t": 44.2548,
+     "equity": 90.0,
+     "usEquityShare": 60.0,
+     "fund": "2070"
+    }
+   ]
+  }
+ ]
+}

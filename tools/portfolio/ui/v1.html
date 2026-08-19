@@ -662,7 +662,7 @@ svg.chart.is-swap { animation: chart-swap var(--fast) var(--ease); }
            lower down the card, where growing costs nothing above it. -->
       <div class="chart-head">
         <div class="chart-actions">
-          <button type="button" class="choice" id="scale-toggle" aria-pressed="false" aria-describedby="scale-note">Equal % moves, equal size</button>
+          <button type="button" class="choice" id="scale-toggle" aria-pressed="false" aria-describedby="scale-note">Log scale</button>
           <button type="button" class="choice" id="dq-toggle" aria-expanded="false" aria-controls="dq-panel" hidden>Data notes<span class="count" id="dq-count"></span></button>
           <button type="button" class="choice" id="table-toggle" aria-pressed="false" aria-controls="table-view">Table view</button>
         </div>
@@ -1258,7 +1258,7 @@ function paintCopy() {
     (showMoneyIn ? '. ' + MONEY_IN_LABEL + ' are drawn as a step beneath, ending at a net ' + usd2(netIn) +
       ', so the space between the two is a gain of ' + usd2(D.endingValue - netIn) : '') + '. ' +
     (SC.log
-      ? 'The vertical scale is by ratio: equal percentage moves are equal heights, and the axis runs from ' +
+      ? 'The vertical scale is logarithmic: equal percentage moves are equal heights, and the axis runs from ' +
         usd(SC.floor) + ' to ' + usd(SC.top) + ' rather than from zero.'
       : 'The vertical scale is in dollars from a baseline of ' + usd(SC.floor) + '.');
 }
@@ -1275,7 +1275,7 @@ function paintFoot() {
     c === 0 ? 'no reference strategy selected' : c + ' reference ' + (c === 1 ? 'strategy' : 'strategies') + ', same cash flows',
     showMoneyIn ? 'contributions & withdrawals stepped from ' + D.flows.length + ' recorded flows, net ' + usd(netIn)
                 : 'contributions & withdrawals are switched off',
-    SC.log ? 'scale: equal % moves are equal heights, axis from ' + usd(SC.floor) + ' — not $0'
+    SC.log ? 'scale: log, from ' + usd(SC.floor) + ' — not $0'
            : 'scale: dollars from $0',
     'granularity: ' + D.dataQuality.granularity
   ];
@@ -1376,7 +1376,12 @@ function paintFoot() {
    which there is more than one market cycle in the picture to compare. */
 const SUGGEST_RATIO  = 5;
 const SUGGEST_MONTHS = 120;
-const SCALE_LABEL = 'Equal % moves, equal size';
+/* What the control says. The name is the plain one a reader can look up; the
+   PROPERTY it buys them — equal percentage moves drawn as equal heights — is
+   the reason anyone would want it, and that lives in the note under the plot
+   and in the announcement, where there is room to say it in a sentence. A
+   button is not a place to explain a scale. */
+const SCALE_LABEL = 'Log scale';
 
 let scaleLog = false;
 let SC = null;
@@ -1431,48 +1436,155 @@ function plotted() {
   return { min: lo, max: hi, bad: bad };
 }
 
+/* SCALE-LADDERS-BEGIN — v1-scale-check.js lifts the source between these two
+   markers out of this file and drives it directly, so the test can never be
+   testing a stale copy of the arithmetic. Keep the markers. */
+
 /* Round numbers, going down. 9,346 becomes 8,000 — the floor is meant to sit
-   under the data and be a figure a person would say out loud. */
-const NICE = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8];
+   under the data and be a figure a person would say out loud.
+
+   This ladder is deliberately DENSER than the one the log axis labels with
+   (below). The two jobs are not the same job: a ladder is read as a sequence,
+   so its rhythm matters, while the floor is a single number nobody compares
+   to a neighbour — there is no rhythm to spoil. What a floor has to do is sit
+   close under the data, because every dollar between the floor and the lowest
+   value drawn is plot height spent on nothing. Under a $10,000 minimum this
+   gives $8,000; a 1/2/5 ladder would give $5,000 and throw away a third of
+   the plot. */
+const FLOOR_STEPS = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8];
 function niceDown(v) {
   const p = Math.pow(10, Math.floor(Math.log10(v)));
   const m = v / p;
-  let best = NICE[0];
-  for (let i = 0; i < NICE.length; i++) if (NICE[i] <= m + 1e-9) best = NICE[i];
+  let best = FLOOR_STEPS[0];
+  for (let i = 0; i < FLOOR_STEPS.length; i++) if (FLOOR_STEPS[i] <= m + 1e-9) best = FLOOR_STEPS[i];
   return best * p;
 }
 
-/* Log ticks are not evenly spaced, so the set has to be chosen for the height
-   available rather than divided out of it. Take the richest mantissa set whose
-   every gap still clears the minimum, and stop. The sets get coarser, never
-   uglier: each one is a subset of round money figures. */
+/* Round numbers, going up, for a linear ladder: the step a person would count
+   in. Lives here beside niceDown because it is the same kind of rounding, and
+   because the log axis borrows it for the narrow-range case below. */
+function niceStep(raw) {
+  const p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const m = raw / p;
+  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+}
+
+/* The mantissa ladders, densest first. 1/2/5 is the PRIMARY one and the rest
+   exist only to be fallen back on.
+
+   1/2/5 because a log axis spaces its labels by the log of the mantissa, and
+   1, 2, 5 have log10 gaps of 0.301, 0.398, 0.301 — near enough even that the
+   axis reads as a ruler. The nine-value ladder this file used to lead with
+   (1, 1.5, 2, 2.5, 3, 4, 5, 6, 8) gives gaps of 0.176, 0.125, 0.097, 0.079,
+   0.125, 0.097, 0.079, 0.125: the labels crowd towards the top of every
+   decade and thin out towards the bottom, and the eye reads that unevenness
+   as the DATA doing something. It is not.
+
+   Down from 1/2/5 there is one step: [1], the powers of ten, for a plot too
+   short to carry three labels in a decade. Up from it there is one step too,
+   for a window under a decade where 1/2/5 alone would leave one or two lonely
+   labels — and it is 1/2/5 with the geometric half-steps inserted (1.5 ≈ √2,
+   3 ≈ √(2·5), 7 ≈ √(5·10)) rather than a different ladder, so every label the
+   sparse set had stays exactly where it was and the new ones land midway
+   between. Refining a ladder should never move a line that was already
+   drawn. */
 const LOG_TIERS = [
-  [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8],
   [1, 1.5, 2, 3, 5, 7],
-  [1, 2, 3, 5],
   [1, 2, 5],
   [1]
 ];
+const LOG_PRIMARY = 1;    /* index of [1, 2, 5] in LOG_TIERS */
+const LOG_MIN_TICKS = 3;  /* under three labels an axis stops being a scale */
+
+/* Round tick values placed LINEARLY across a range, coarsest set first, so
+   what comes back is the sparsest ladder that still puts two labels in. */
+function linearTicksIn(lo, hi) {
+  const span = hi - lo, eps = span * 1e-9;
+  const divisors = [4, 5, 8, 10, 20, 50, 100, 200];
+  for (let d = 0; d < divisors.length; d++) {
+    const st = niceStep(span / divisors[d]);
+    if (!(st > 0) || !isFinite(st)) break;
+    const out = [];
+    for (let v = Math.ceil((lo + eps) / st) * st; v <= hi + eps; v += st) if (v > lo) out.push(v);
+    if (out.length >= 2) return out;
+  }
+  return [];
+}
+
+/* Log ticks are not evenly spaced, so the set has to be chosen for the height
+   available rather than divided out of it. Start at 1/2/5; go denser only if
+   it left too few labels, coarser only if it left them too close together. */
 function logTicks(lo, hi, pxPerLn, minGap) {
-  for (let t = 0; t < LOG_TIERS.length; t++) {
+  if (!(lo > 0) || !isFinite(lo) || !isFinite(hi)) return [];
+  /* A range of literally no width — the same number for the floor and the
+     top. There is no ladder across it and no midpoint inside it, so the one
+     honest answer is the one label. computeScale() cannot produce this: it
+     pads 7% under the lowest value and 7% over the highest, so a flat history
+     or a single observation arrives here as a real range and is handled by
+     the narrow-range fallback at the bottom of this function. This guard is
+     for a caller that has not padded. */
+  if (!(hi > lo)) return [lo];
+
+  const build = function (tier) {
     const out = [];
     for (let e = Math.floor(Math.log10(lo)); e <= Math.ceil(Math.log10(hi)); e++) {
       const d = Math.pow(10, e);
-      LOG_TIERS[t].forEach(function (m) {
+      tier.forEach(function (m) {
         const v = m * d;
         if (v > lo * 1.000001 && v <= hi && out.indexOf(v) < 0) out.push(v);
       });
     }
-    out.sort((a, b) => a - b);
-    if (out.length < 2) continue;
-    let ok = true;
+    return out.sort((a, b) => a - b);
+  };
+  const fits = function (out) {
     for (let i = 1; i < out.length; i++) {
-      if ((Math.log(out[i]) - Math.log(out[i - 1])) * pxPerLn < minGap) { ok = false; break; }
+      if ((Math.log(out[i]) - Math.log(out[i - 1])) * pxPerLn < minGap) return false;
     }
-    if (ok) return out;
+    return true;
+  };
+
+  const primary = build(LOG_TIERS[LOG_PRIMARY]);
+  if (primary.length >= LOG_MIN_TICKS) {
+    if (fits(primary)) return primary;
+    /* Crowded: 1/2/5 is too fine for the height. Go coarser. */
+    for (let t = LOG_PRIMARY + 1; t < LOG_TIERS.length; t++) {
+      const out = build(LOG_TIERS[t]);
+      if (out.length >= 2 && fits(out)) return out;
+    }
+  } else {
+    /* Bare: the window is under a decade and 1/2/5 barely lands in it. Go
+       denser, but only as far as the height will still carry. */
+    for (let t = LOG_PRIMARY - 1; t >= 0; t--) {
+      const out = build(LOG_TIERS[t]);
+      if (out.length > primary.length && fits(out)) return out;
+    }
+    if (primary.length >= 2 && fits(primary)) return primary;
   }
-  return [];
+
+  /* Nothing on any mantissa ladder lands in this window often enough. If the
+     window is under half a decade, no ladder ever will: 40,000–54,000 holds
+     exactly one round mantissa, and 10,000–13,200 holds none at all, which is
+     how an ordinary portfolio — one that barely moved over the period, or a
+     flat or single-observation history — used to end up with a y axis
+     carrying no labels whatsoever.
+
+     So place the labels LINEARLY across the window instead. This is not a
+     second scale sneaking in behind the first: the POSITIONS are still the
+     log mapping, computed by the same y() as everything else drawn, and only
+     the choice of which values get a label changes. And over a window this
+     narrow the distinction is invisible anyway — across a 1.35x range the log
+     curve departs from the straight line by about 1.4% of the plot height,
+     and across the 1.02x range of a portfolio that did not move, by under a
+     twentieth of a pixel. Nothing is announced to the reader because nothing
+     the reader can see is different; the axis simply has numbers on it. */
+  if (hi / lo < Math.sqrt(10)) return linearTicksIn(lo, hi);
+  /* Wider than half a decade, so the powers of ten are in there somewhere.
+     If even those were judged too close together, draw them anyway — a
+     crowded axis is still readable, and an empty one is not. */
+  const decades = build(LOG_TIERS[LOG_TIERS.length - 1]);
+  return decades.length >= 2 ? decades : linearTicksIn(lo, hi);
 }
+/* SCALE-LADDERS-END */
 
 /* Recomputed on every state change, never on a resize: the floor and the top
    come from the data alone, so the scale does not shift when the window does. */
@@ -1533,7 +1645,7 @@ function paintScale() {
   }
   if (SC.log) {
     put('on', [
-      strong('Equal percentage moves are now equal heights. '),
+      strong('Log scale: equal percentage moves are now equal heights. '),
       'A 20% fall in ' + yearOf(D.months[0]) + ' is the same size on screen as a 20% fall in ' +
       yearOf(D.months[n - 1]) + '. The axis runs ' + usd(SC.floor) + ' to ' + usd(SC.top) +
       ' and does not start at $0, so a height here is a proportion and not an amount — ' +
@@ -1549,7 +1661,9 @@ function paintScale() {
       ', so on a $0 baseline the same 20% move is drawn about ' + nf(Math.round(SC.ratio)) +
       ' times bigger at the top of this plot than at the bottom. ',
       strong(SCALE_LABEL),
-      ' evens that out. Dollars are still the easier thing to read for an amount, which is why the chart starts in them.'
+      ' evens that out: it places values by ratio, so the same percentage move is the same ' +
+      'height wherever on the chart it happens. Dollars are still the easier thing to read ' +
+      'for an amount, which is why the chart starts in them.'
     ]);
     return;
   }
@@ -1562,7 +1676,7 @@ function paintScale() {
 let scaleJustChanged = false;
 function scaleAnnouncement() {
   return SC.log
-    ? 'Vertical scale changed. Equal percentage moves are now drawn as equal heights; the axis runs ' +
+    ? 'Vertical scale changed. This is now a log scale: equal percentage moves are drawn as equal heights. The axis runs ' +
       usd(SC.floor) + ' to ' + usd(SC.top) + ' and no longer starts at zero. Every value is unchanged.'
     : 'Vertical scale changed. Back to dollars from a $0 baseline; equal dollar amounts are now ' +
       'equal heights. Every value is unchanged.';
@@ -1586,11 +1700,6 @@ function scaleAnnouncement() {
 })();
 
 /* ── the chart ──────────────────────────────────────────────────────────── */
-function niceStep(raw) {
-  const p = Math.pow(10, Math.floor(Math.log10(raw)));
-  const m = raw / p;
-  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
-}
 
 const host = document.getElementById('plot');
 const tip = document.getElementById('tip');
@@ -1634,25 +1743,23 @@ function render() {
     const l0 = Math.log(yFloor), k = plotH / (Math.log(yMax) - l0);
     y = v => yBase - (Math.log(v) - l0) * k;
     /* 40px between labels: an 11px tick needs about 14px of line box, and
-       three of those is the point at which an uneven ladder stops reading as
+       three of those is the point at which a log ladder stops reading as
        crowded. The bottom tick is the floor itself and is drawn separately,
        so anything landing on top of it goes.
 
        Then, if 40px left fewer than four labels on the axis, ask again at 30.
        Over a range of several decades the comfortable spacing throws away the
        whole 1-2-5 ladder and leaves three lonely powers of ten; 30px still
-       clears an 11px label twice over, and the denser ladder is what makes a
+       clears an 11px label twice over, and the 1-2-5 ladder is what makes a
        thirty-year axis readable rather than merely uncluttered. */
     const pick = g => logTicks(yFloor, yMax, k, g).filter(v => yBase - y(v) > 26);
     ticks = pick(40);
     if (ticks.length < 4) { const denser = pick(30); if (denser.length > ticks.length) ticks = denser; }
     if (ticks.length < 2) {
-      /* A range too narrow for round powers — a log axis over less than half a
-         decade. Fall back to the linear ladder, which is round by construction
-         and, over a range this tight, lands in visibly the right places. */
-      const st = niceStep((yMax - yFloor) / 4);
-      ticks = [];
-      for (let v = Math.ceil(yFloor / st) * st; v <= yMax; v += st) if (v > yFloor) ticks.push(v);
+      /* logTicks() always returns at least two ticks for a real range, so
+         reaching here means the filter above took one off the floor. Ask the
+         same linear placement it uses for a narrow window, unfiltered. */
+      ticks = linearTicksIn(yFloor, yMax);
     }
     compactTicks = true;
   } else {
@@ -1714,9 +1821,9 @@ function render() {
     svg.appendChild(S('text', {
       class: 'axis-caption', x: 0, y: 13, 'text-anchor': 'start'
     }, tiny
-      ? 'AXIS ' + compactUsd(yFloor) + '–' + compactUsd(yMax) + ' · NOT $0'
+      ? 'AXIS ' + compactUsd(yFloor) + '–' + compactUsd(yMax) + ' · LOG · NOT $0'
       : 'AXIS ' + compactUsd(yFloor) + ' – ' + compactUsd(yMax) +
-        ' · NOT FROM $0 · EQUAL % MOVES ARE EQUAL HEIGHTS'));
+        ' · LOG SCALE · NOT FROM $0'));
   }
 
   /* x ticks — years, at January. Every January gets its mark; the LABELS are
@@ -2154,8 +2261,8 @@ function update(announce, msg) {
     /* The reader did not ask for this, so they are told. It happens when a
        newly drawn series brings a $0 or a negative value onto the chart. */
     announce = true;
-    msg = 'Vertical scale changed. Equal percentage moves cannot be drawn as equal heights when a ' +
-      'value is $0 or negative, and ' + SC.bad[0] + ', so this is back to dollars. Every value is unchanged.';
+    msg = 'Vertical scale changed. A log scale cannot be drawn when a value is $0 or negative, ' +
+      'and ' + SC.bad[0] + ', so this is back to dollars. Every value is unchanged.';
     SC.forcedOff = false;
   }
   if (announce) {

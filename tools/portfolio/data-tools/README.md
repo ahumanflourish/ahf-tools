@@ -104,6 +104,50 @@ magnitudes, plus a compounded per-year view. If the disagreements point
 consistently one way it says so and computes the implied annual basis
 difference, which is how a price-only second source announces itself.
 
+## The constructed target-date series
+
+`glide_reconcile.mjs` is a second, separate checker, for the one series in this
+project that is **modelled rather than measured**: the constructed target-date
+reference in `core/src/glide.ts`, built by applying Vanguard's published glide
+path (`core/src/data/glide-path.json`, nineteen dated cross-sections read out of
+SEC filings 2007–2026) to `US_TOTAL`, `INTL_TOTAL` and `BOND_TOTAL`.
+
+```bash
+node glide_reconcile.mjs            # full report
+node glide_reconcile.mjs --json     # machine output
+node glide_reconcile.mjs --extra 8  # add 8bp/yr of drag and re-measure
+```
+
+It checks two things, against two independent ground truths, because the
+construction has two halves that fail differently:
+
+1. **Monthly, against the real fund.** `benchmarks.json` carries the real VTTSX
+   from 2021-10. A constructed 2060 series over the same window currently lands
+   at **mean −0.14bp, rms 10.2bp a month**, with every calendar year inside
+   11.2bp. That is the acceptance test, and `core/test/glide.test.ts` asserts
+   it. But the 2060 fund is ~90% equity, so it barely exercises the bond side.
+2. **Annual, across the whole ladder,** against the issuer's published
+   calendar-year returns for every fund from 2020 to 2065
+   (`sources/issuer-target-date-annual.json`, from the January 2026 summary
+   prospectuses). This is the check that matters, because it sweeps the glide
+   path from 90% equity down to 34% and therefore prices the approximation the
+   construction actually makes — `benchmarks.json` has no short-term TIPS series
+   and no hedged international bond series, so both are modelled as US
+   investment-grade bonds. The residual tracks the bond share monotonically:
+   **~8bp/yr rms on the long-dated funds, ~58bp/yr on one already past its
+   target year.** That degradation is the honest limit of the construction and
+   it is stated in the strategy's own `caution`.
+
+The reconciliation arithmetic here is a deliberate re-implementation rather than
+an import of `core/src/glide.ts`. A check that shares its arithmetic with the
+thing it checks can only confirm that a function equals itself.
+
+**Refresh.** One new glide-path schedule a year, appended, when Vanguard files
+its January 485BPOS — the numbers are the composite index "portion allocations"
+in each fund's *Annual Total Returns* preamble. Existing schedules never change;
+they are what the issuer said on a date that has passed. Re-run this tool after
+every append.
+
 ## Offline by construction
 
 There are no network calls in this tool and there is a test asserting there
@@ -124,4 +168,7 @@ src/report.mjs        tables and verdicts
 src/degrade.mjs       deliberate corruptions, used by both the tests and `demo`
 test/verify.test.mjs  node:test suite
 docs/NOISE-FLOOR.md   how the tolerances were derived
+glide_reconcile.mjs   constructed target-date series vs. the real fund and
+                      vs. the issuer's published annual returns
+sources/              issuer ground truth taken from SEC filings, not shipped
 ```
