@@ -32,6 +32,12 @@
  * recomputes every figure the model reports; when the two disagree, that is a
  * red banner — "Claude's totals do not match the rows it produced" — and it
  * catches a class of extraction error no schema can see, for free.
+ *
+ * AND ONE THING THAT IS NEITHER: `normaliseAmounts`. A signed amount is the one
+ * value-level problem where leaving the number alone produces a SILENT wrong
+ * answer rather than a visible one, so it is corrected rather than merely
+ * reported. It is the only place in this package that changes a model's number,
+ * and it never does so quietly.
  */
 
 import {
@@ -42,7 +48,12 @@ import {
   ROW_TYPES,
   SCHEMA_VERSION,
 } from './schema';
-import type { ExtractionResult, ExtractedRow, InputRowLike } from './types';
+import type {
+  ExcludedEntry,
+  ExtractionResult,
+  ExtractedRow,
+  InputRowLike,
+} from './types';
 
 /* ───────────────────────────────────────────────────────── shape issues */
 
@@ -279,6 +290,7 @@ export type WarningCode =
   | 'too-few-balances'
   | 'non-positive-amount'
   | 'non-positive-balance'
+  | 'negative-amount'
   | 'future-date'
   | 'duplicate-row'
   | 'mixed-currency'
@@ -317,6 +329,114 @@ export interface RecomputedSummary {
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/* ─────────────────────────────────────────────── the sign convention */
+
+/** One amount whose sign was corrected, with both numbers kept. */
+export interface AmountCorrection {
+  /** `rows[3]` or `excluded[2]`. */
+  path: string;
+  where: 'rows' | 'excluded';
+  index: number;
+  /** As the model typed it. */
+  type: ExtractedRow['type'];
+  from: number;
+  to: number;
+}
+
+/**
+ * Make every amount positive, and say so loudly.
+ *
+ * THE PROBLEM THIS SOLVES, AND WHY IT IS DIFFERENT FROM EVERY OTHER CHECK.
+ * The contract is that all three row types carry POSITIVE amounts and that
+ * direction is given by `type`. The schema cannot enforce it: `minimum` is not
+ * in the API's supported subset and is dropped SILENTLY, so a schema carrying
+ * it would read as if it validated the range and would not. And the model's
+ * instinct runs the other way — probe batch 2 returned `amount: -450.00` for a
+ * withdrawal on a one-page document.
+ *
+ * A negative withdrawal that reaches the engine is subtracted as a negative:
+ * money leaving becomes money arriving, and the direction is counted twice in
+ * opposite senses. Nothing downstream can see it. It is a plausible wrong
+ * number the user will believe, which is the exact failure class this whole
+ * tool exists to catch.
+ *
+ * NORMALISE OR REJECT? Normalise, and gate.
+ *
+ *  - Rejecting means a schema-mismatch on the whole extraction: two hundred
+ *    good rows discarded because one sign convention slipped. That is a bad
+ *    trade against a review table that exists precisely to let a person fix
+ *    one cell.
+ *  - The MAGNITUDE is never in doubt. |−450| is 450 under every reading.
+ *  - The DIRECTION is. There are two ways to write `-450` on a withdrawal:
+ *    the sign is redundant with `type` (the common case, and the one probe 2
+ *    produced), or the sign contradicts `type` and the model meant the other
+ *    direction. Nothing in the reply distinguishes them.
+ *  - So: keep the declared `type`, correct the magnitude, and raise an
+ *    `error`-severity warning naming the row. `error` blocks compute in the
+ *    review table, so a human must look at that one row against the statement
+ *    before any arithmetic runs. A silent wrong number becomes a hard gate on
+ *    one cell — which is the outcome this package prefers everywhere else too.
+ *
+ * BALANCES ARE DELIBERATELY NOT TOUCHED. A negative account value is not a
+ * sign-convention slip; it is either meaningless or a real margin debit, and
+ * either way flipping it invents a number. `crossCheck` reports it as
+ * `non-positive-balance` at `error` severity and leaves it alone.
+ *
+ * EXCLUSIONS ARE CORRECTED AT `warning` SEVERITY, not `error`. They never reach
+ * the maths — nothing in `excluded` is summed into anything the engine sees —
+ * so a sign slip there is a display problem, not a wrong answer.
+ *
+ * Never mutates its input. `outcome.raw` still holds exactly what came back.
+ */
+export function normaliseAmounts(result: ExtractionResult): {
+  result: ExtractionResult;
+  corrections: AmountCorrection[];
+  warnings: ExtractionWarning[];
+} {
+  const corrections: AmountCorrection[] = [];
+  const warnings: ExtractionWarning[] = [];
+
+  // `< 0` and not `!(x > 0)`: zero has no sign to correct and no direction to
+  // be ambiguous about. It stays put and stays a `non-positive-amount` warning.
+  const rows: ExtractedRow[] = result.rows.map((row, index) => {
+    if (row.type === 'balance' || !(row.amount < 0)) return row;
+    const to = Math.abs(row.amount);
+    const path = `rows[${index}]`;
+    corrections.push({ path, where: 'rows', index, type: row.type, from: row.amount, to });
+    warnings.push({
+      code: 'negative-amount',
+      severity: 'error',
+      message: `${row.date}: this ${row.type} came back as ${row.amount}. Amounts carry no sign — direction comes from the type — so it is shown as ${to}. Check the statement and confirm the direction before continuing.`,
+      path,
+    });
+    return { ...row, amount: to };
+  });
+
+  const excluded: ExcludedEntry[] = result.excluded.map((entry, index) => {
+    if (!(entry.amount < 0)) return entry;
+    const to = Math.abs(entry.amount);
+    const path = `excluded[${index}]`;
+    corrections.push({
+      path,
+      where: 'excluded',
+      index,
+      type: entry.type,
+      from: entry.amount,
+      to,
+    });
+    warnings.push({
+      code: 'negative-amount',
+      severity: 'warning',
+      message: `${entry.date}: this excluded ${entry.type} came back as ${entry.amount} and is shown as ${to}. It is excluded either way, so nothing is computed from it.`,
+      path,
+    });
+    return { ...entry, amount: to };
+  });
+
+  if (corrections.length === 0) return { result, corrections, warnings };
+  return { result: { ...result, rows, excluded }, corrections, warnings };
+}
 
 /** Recompute every figure the model reports in `summary`, from its own rows. */
 export function recomputeSummary(result: ExtractionResult): RecomputedSummary {

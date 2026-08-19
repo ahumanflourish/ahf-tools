@@ -27,16 +27,26 @@ export {
   normaliseBase64,
   DEFAULT_MODEL,
   DEFAULT_MAX_TOKENS,
+  DEFAULT_ANSWER_TOKENS,
+  DEFAULT_THINKING_BUDGET_TOKENS,
+  MIN_THINKING_BUDGET_TOKENS,
+  DEFAULT_STREAM,
   DEFAULT_TIMEOUT_MS,
+  DEFAULT_FIRST_EVENT_TIMEOUT_MS,
+  DEFAULT_STALL_TIMEOUT_MS,
+  PROGRESS_INTERVAL_MS,
   MAX_BASE64_BYTES,
   MESSAGES_ENDPOINT,
 } from './extract';
+
+export { decodeSseFrames, MarkerCounter, StreamAssembler } from './stream';
 
 export {
   validateExtraction,
   validateAgainstSchema,
   isCalendarDate,
   crossCheck,
+  normaliseAmounts,
   recomputeSummary,
   toInputRows,
   ENUMS,
@@ -47,11 +57,15 @@ export type {
   ExtractInput,
   ExtractOptions,
   ExtractOutcome,
+  ExtractProgress,
   FetchLike,
+  StreamBodyLike,
+  StreamReaderLike,
   TokenUsage,
 } from './extract';
 
 export type {
+  AmountCorrection,
   ExtractionWarning,
   RecomputedSummary,
   ValidationIssue,

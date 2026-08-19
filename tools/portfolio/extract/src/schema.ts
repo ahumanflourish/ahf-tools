@@ -25,6 +25,14 @@
  * calendar-date validity (`2025-02-30` satisfies `format: "date"` shape-wise
  * but is not a day) and every cross-field check live in `validate.ts` instead,
  * where they actually run.
+ *
+ * THE MISSING `minimum` IS NOT THEORETICAL. Probe batch 2 (2026-08-19) returned
+ * `amount: -450.00` for a withdrawal, and `type: "transfer"` for a movement
+ * between accounts. The first is caught and corrected by `normaliseAmounts`,
+ * loudly; the second is caught by `ROW_TYPES` being a CLOSED enum, which the
+ * validator enforces even if the API's own enforcement lapses. Both are also
+ * spelled out in the descriptions below, because the descriptions are the only
+ * part of this document the model reads.
  */
 
 /** Bumped when the shape changes in a way a stored extraction cannot survive. */
@@ -251,10 +259,10 @@ const rowSchema = {
       type: 'string',
       enum: ROW_TYPES,
       description:
-        'balance = total account value on that date. contribution = new money entering from outside the accounts being analysed. withdrawal = money leaving them for good.',
+        'balance = total account value on that date. contribution = new money entering from outside the accounts being analysed. withdrawal = money leaving them for good. These three are the only permitted values; there is no "transfer" — money moving between the person\'s own accounts belongs in excluded with reason internal-transfer.',
     },
     amount: num(
-      'A positive number. No currency symbol, no thousands separators. Direction is carried by type, never by the sign.',
+      'A POSITIVE number, always. No currency symbol, no thousands separators, no minus sign and no parentheses. Direction is carried by type and by nothing else: a withdrawal of 450 is 450, never -450. A negative amount states the direction twice and the two cancel.',
     ),
     currency: str(
       'ISO 4217 code, uppercase, e.g. USD, GBP, EUR. Use "UNKNOWN" if the document never states it — do not assume.',
@@ -302,9 +310,10 @@ const excludedSchema = {
     type: {
       type: 'string',
       enum: ROW_TYPES,
-      description: 'What the excluded line would have been, had you kept it.',
+      description:
+        'What the excluded line would have been, had you kept it — balance, contribution or withdrawal. Both legs of an internal transfer keep their own direction here; "reason" is what marks them as transfers, so there is no "transfer" value.',
     },
-    amount: num('Positive number, as above.'),
+    amount: num('A POSITIVE number, as above. Never signed, even for the leg that left.'),
     currency: str('ISO 4217 code, or "UNKNOWN".'),
     reason: {
       type: 'string',

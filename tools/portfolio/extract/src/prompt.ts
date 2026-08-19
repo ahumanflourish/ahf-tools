@@ -9,13 +9,18 @@
  * `description` fields carry the field-level meaning. What replaces it is
  * judgement: the traps, and how to decide when a document is ambiguous.
  *
- * WHY THAT TRADE IS WORTH MAKING TWICE OVER. The proxy serves
- * `claude-sonnet-4-6` whatever we ask for, and we do not send a `thinking`
- * parameter, so on that model there is no extended reasoning to lean on. The
- * quarterly reconstruction and the transfer trap — the two things that produced
- * real errors in the original analysis — now depend entirely on the prompt
- * being explicit about the procedure. Every word spent on comma placement was a
- * word not spent there.
+ * WHY THAT TRADE IS WORTH MAKING TWICE OVER. The quarterly reconstruction and
+ * the transfer trap — the two things that produced real errors in the original
+ * analysis — are the reasoning-heavy cases, and every word spent on comma
+ * placement was a word not spent on them.
+ *
+ * THINKING IS NOW ON, AND THESE PROCEDURES STAY ANYWAY. `thinking` was probed
+ * through the proxy on 2026-08-19 and is honoured, so `claude-sonnet-4-6` does
+ * get a reasoning pass over exactly those two traps. That is a reason to keep
+ * the explicit procedures, not to delete them: a reasoning pass improves the
+ * odds on a hard document and a spelled-out procedure holds on an easy one
+ * where the model does not think for long. Both are cheap. The failure they
+ * prevent is a plausible wrong number the person will believe.
  *
  * TONE. Instructions, not requests. The prompt is a system prompt now, not
  * something a person pastes, so there is nobody to be polite to.
@@ -45,6 +50,14 @@ The same applies to dates, currencies, and account identities. "Probably January
 
 **withdrawal** — money leaving that set for good.
 
+There is no fourth type. In particular THERE IS NO \`transfer\` TYPE: a movement between the person's own accounts is not a row at all, it belongs in \`excluded\` with reason \`internal-transfer\`. Emitting \`type: "transfer"\` puts the whole extraction outside the contract and the entire reply is rejected, so the rows you read correctly are lost along with it.
+
+# Amounts carry no sign, ever
+
+Every amount you emit — in \`rows\` and in \`excluded\` alike — is a POSITIVE number. Direction is carried by \`type\` and by nothing else. A withdrawal of four hundred and fifty is \`{"type": "withdrawal", "amount": 450.00}\`, never \`-450.00\`, even where the statement prints it in parentheses or with a minus sign in a debit column.
+
+This matters because a negative withdrawal states the direction twice, once in the type and once in the sign, and the two cancel: money leaving becomes money arriving. Nothing further down can see that it happened. Read the magnitude, drop the sign, and let the type say which way it went.
+
 # The boundary rule, which decides most hard cases
 
 Draw a line around every account the person has given you. Money crossing INTO that line from outside is a contribution. Money crossing OUT of it is a withdrawal. Money moving between accounts INSIDE the line is neither — it is an internal transfer and both legs are excluded.
@@ -60,7 +73,7 @@ Look for:
 - descriptions containing transfer, journal, rollover, ACAT, wire to/from, "to account ...1234", "from your other account";
 - a withdrawal on one statement whose amount matches a deposit on another statement of the same period.
 
-Put BOTH legs in \`excluded\` with reason \`internal-transfer\`, and name the other leg in \`pairedWith\`. If you find one leg and cannot find its partner, still exclude it, leave \`pairedWith\` empty, and say in \`note\` that the partner was not located — an unmatched leg is a finding, not a failure.
+Put BOTH legs in \`excluded\` with reason \`internal-transfer\`, and name the other leg in \`pairedWith\`. Both legs keep the type they would have had — \`contribution\` for the leg arriving, \`withdrawal\` for the leg leaving — because \`reason\` is what marks them as transfers. Do not invent a type for them. If you find one leg and cannot find its partner, still exclude it, leave \`pairedWith\` empty, and say in \`note\` that the partner was not located — an unmatched leg is a finding, not a failure.
 
 Detection also runs deterministically in the tool afterwards, so a pair you miss is not fatal. A pair you invent is: do not exclude two unrelated flows because their amounts happen to be similar.
 
