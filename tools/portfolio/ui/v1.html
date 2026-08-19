@@ -172,7 +172,7 @@ h1.display { font-size: var(--text-h1); max-width: 30ch; color: var(--accent); }
    never move a checkbox. */
 .chart-layout {
   display: grid;
-  grid-template-areas: "head" "plot" "rail" "caut" "foot" "dq";
+  grid-template-areas: "head" "plot" "rail" "caut" "note" "foot" "dq";
   grid-template-columns: minmax(0, 1fr);
   column-gap: 28px;
 }
@@ -180,6 +180,7 @@ h1.display { font-size: var(--text-h1); max-width: 30ch; color: var(--accent); }
 .plot-wrap  { grid-area: plot; }
 .rail       { grid-area: rail; }
 .cautions   { grid-area: caut; }
+.scale-note { grid-area: note; }
 .chart-foot { grid-area: foot; }
 .dq         { grid-area: dq; }
 
@@ -189,13 +190,13 @@ h1.display { font-size: var(--text-h1); max-width: 30ch; color: var(--accent); }
 }
 @media (min-width: 1060px) {
   .chart-layout {
-    grid-template-areas: "head rail" "plot rail" "caut rail" "foot rail" "dq rail" ".    rail";
+    grid-template-areas: "head rail" "plot rail" "caut rail" "note rail" "foot rail" "dq rail" ".    rail";
     grid-template-columns: minmax(0, 1fr) var(--rail);
     /* The rail spans every row. The trailing flexible row absorbs whatever
        height it has over the chart column, so the plot and its meta line stay
        together at the top of the card instead of the slack being shared out
        among them. */
-    grid-template-rows: auto auto auto auto auto 1fr;
+    grid-template-rows: auto auto auto auto auto auto 1fr;
   }
   .rail {
     align-self: start; margin-top: 0; padding-top: 0;
@@ -239,6 +240,16 @@ svg.chart:focus-visible { outline: var(--border-thick) dotted var(--accent); out
   font-family: 'Instrument Sans', system-ui, sans-serif;
   font-size: 11px; font-weight: 500;
   font-variant-numeric: tabular-nums;
+  fill: var(--subtle);
+}
+/* The two labels that exist only on the ratio scale, and only to say what the
+   scale is NOT: the caption over the top-left corner and the word under the
+   bottom tick. Both are the micro size, tracked, in the same recessive fill as
+   the ticks — they are axis furniture, not annotation. */
+.axis-caption, .axis-floor-note {
+  font-family: 'Instrument Sans', system-ui, sans-serif;
+  font-size: var(--text-micro); font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-micro);
   fill: var(--subtle);
 }
 .end-value {
@@ -544,7 +555,44 @@ a:hover { color: var(--accent); text-decoration-style: solid; }
 .caution-strip svg { flex: none; margin-top: 3px; color: var(--attention); }
 .caution-strip b { font-weight: 600; color: var(--ink); }
 
-.chart-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+/* ── the scale control and the line that explains it ────────────────────
+   A view that is unavailable says so where it stands and stays reachable: it
+   takes aria-disabled rather than the disabled attribute, so it keeps its
+   place in the tab order and a keyboard reader can land on it and hear the
+   reason. Dotted and dimmed is this brand's idle/inactive grammar; the width
+   never changes, because the label never changes. */
+.choice[aria-disabled="true"] {
+  cursor: not-allowed;
+  color: color-mix(in oklab, var(--ink) 30%, transparent);
+  border-style: dotted; border-color: var(--line-soft);
+  background: transparent;
+}
+/* The note sits BELOW the plot, below the cautions and below the rail at both
+   widths — the same rule the caution strip follows. It changes with the
+   selection and with the scale, and it may appear and disappear, so it may not
+   sit above anything the reader aims at. A left rule rather than a box: this
+   is a remark about the chart, not a warning about the data. */
+.scale-note:empty { display: none; }
+.scale-note {
+  margin-top: 18px; padding: 9px 0 9px 13px;
+  border-left: var(--border-thick) solid var(--line-soft);
+  font-size: var(--text-meta); line-height: 1.55; color: var(--muted);
+  max-width: 88ch;
+}
+.scale-note b { font-weight: 600; color: var(--ink); }
+/* Unavailable is a different state from suggested, and border STYLE is how
+   this brand says so — dashed for pending/blocked, solid for live. */
+.scale-note[data-kind="off"] { border-left-style: dashed; border-left-color: var(--line); }
+.scale-note[data-kind="on"]  { border-left-color: var(--marker); }
+
+/* Three controls now, and a phone cannot hold them on one line. Wrapping to a
+   second row keeps each one whole; letting them shrink instead wrapped the
+   words INSIDE the buttons, which made three different button heights. */
+.chart-actions {
+  display: flex; flex-wrap: wrap; justify-content: flex-end;
+  align-items: center; gap: 10px 12px; margin-left: auto;
+}
+.choice { white-space: nowrap; }
 .choice[aria-expanded="true"] {
   border-style: solid; border-color: var(--ink);
   color: var(--ink); background: color-mix(in oklab, var(--accent) 12%, transparent);
@@ -614,7 +662,8 @@ svg.chart.is-swap { animation: chart-swap var(--fast) var(--ease); }
            costs nothing above it. -->
       <div class="chart-head">
         <div class="chart-actions">
-          <button type="button" class="choice" id="dq-toggle" aria-expanded="false" aria-controls="dq-panel" hidden>Data notes<span class="count" id="dq-count"></span></button>
+          <button type="button" class="choice" id="scale-toggle" aria-pressed="false" aria-describedby="scale-note">Equal % moves, equal size</button>
+<button type="button" class="choice" id="dq-toggle" aria-expanded="false" aria-controls="dq-panel" hidden>Data notes<span class="count" id="dq-count"></span></button>
           <button type="button" class="choice" id="table-toggle" aria-pressed="false" aria-controls="table-view">Table view</button>
         </div>
       </div>
@@ -624,6 +673,8 @@ svg.chart.is-swap { animation: chart-swap var(--fast) var(--ease); }
       </div>
 
       <div class="cautions" id="cautions" role="region" aria-label="Cautions on the strategies currently shown"></div>
+
+<p class="scale-note" id="scale-note"></p>
 
       <div class="chart-foot" id="chart-foot"></div>
 
@@ -696,8 +747,13 @@ D.flows = [{"date":"2021-10-12","type":"contribution","amount":10000.0},{"date":
 /* ── formatting ─────────────────────────────────────────────────────────── */
 const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const nf = (v, dp) => v.toLocaleString('en-US', { minimumFractionDigits: dp || 0, maximumFractionDigits: dp || 0 });
-const usd  = v => '$' + nf(Math.round(v));
-const usd2 = v => '$' + nf(v, 2);
+/* A negative amount takes the true minus BEFORE the dollar sign. It reaches
+   these two only where the figure itself can go negative — a net contribution
+   in drawdown, a reference the withdrawals outran — and "$-2,400" is not how
+   anyone writes that. `signed` already passes an absolute value, so it is
+   unaffected. */
+const usd  = v => (v < 0 ? '−' : '') + '$' + nf(Math.round(Math.abs(v)));
+const usd2 = v => (v < 0 ? '−' : '') + '$' + nf(Math.abs(v), 2);
 const signed = v => (v < 0 ? '−' : '+') + usd(Math.abs(v));
 const monthOf = key => { const p = key.split('-'); return MON[+p[1] - 1] + ' ' + p[0]; };
 const dayOf   = key => { const p = key.split('-'); return (+p[2]) + ' ' + MON[+p[1] - 1]; };
@@ -1200,7 +1256,11 @@ function paintCopy() {
       c.map(x => x.s.label + ' ending at ' + usd2(x.s.endingValue) + ', a difference of ' +
         signed(D.endingValue - x.s.endingValue)).join('; ') : ', with no reference strategy selected') +
     (showMoneyIn ? '. ' + MONEY_IN_LABEL + ' are drawn as a step beneath, ending at a net ' + usd2(netIn) +
-      ', so the space between the two is a gain of ' + usd2(D.endingValue - netIn) : '') + '.';
+      ', so the space between the two is a gain of ' + usd2(D.endingValue - netIn) : '') + '. ' +
+    (SC.log
+      ? 'The vertical scale is by ratio: equal percentage moves are equal heights, and the axis runs from ' +
+        usd(SC.floor) + ' to ' + usd(SC.top) + ' rather than from zero.'
+      : 'The vertical scale is in dollars from a baseline of ' + usd(SC.floor) + '.');
 }
 
 /* footer meta + data-quality state */
@@ -1215,6 +1275,8 @@ function paintFoot() {
     c === 0 ? 'no reference strategy selected' : c + ' reference ' + (c === 1 ? 'strategy' : 'strategies') + ', same cash flows',
     showMoneyIn ? 'contributions & withdrawals stepped from ' + D.flows.length + ' recorded flows, net ' + usd(netIn)
                 : 'contributions & withdrawals are switched off',
+    SC.log ? 'scale: equal % moves are equal heights, axis from ' + usd(SC.floor) + ' — not $0'
+           : 'scale: dollars from $0',
     'granularity: ' + D.dataQuality.granularity
   ];
   bits.forEach(function (t, i) {
@@ -1267,6 +1329,255 @@ function paintFoot() {
   });
 })();
 
+/* ── the vertical scale ─────────────────────────────────────────────────
+   Two ways of spending the plot's height, and they answer different
+   questions.
+
+   DOLLARS (the default, and it stays the default): the axis starts at $0 and
+   every inch is the same number of dollars. The headline claim of this page is
+   an amount of money, and an amount is a linear question. It is also the only
+   scale on which the space between your line and your contributions reads
+   directly as the gain in dollars.
+
+   RATIO: every inch is the same PERCENTAGE. A 20% fall in 2022 is then drawn
+   the same size as a 20% fall today, which is the correct comparison for a
+   return — on the dollar scale the same 20% is drawn smaller the earlier it
+   happened, purely because the balance was smaller then. Over a long history
+   that is not a nicety: a thirty-year portfolio spends its first fifteen years
+   in the bottom inch of a linear plot.
+
+   The price of it is honesty about the baseline, and the price is paid out
+   loud rather than hidden. A ratio scale cannot contain $0 — there is no
+   number of doublings from zero to anything — so the axis has to start above
+   it, and the axis says so in three places: the bottom rule is broken instead
+   of solid, the bottom tick is captioned NOT $0, and a caption over the plot
+   states the range it actually covers.
+
+   It also cannot contain a zero or a negative value at all, which is not a
+   hypothetical: an account that has been fully withdrawn hits $0, and net
+   contributions go negative for anyone in drawdown who has taken out more than
+   they ever put in. When that happens the VIEW becomes unavailable and says
+   which value made it so. The data is never the thing that gets refused, and
+   no point is ever dropped, clamped or nudged to make the view work. */
+
+/* When the page volunteers the ratio scale. Both thresholds are properties of
+   the data, and neither ever switches the scale by itself.
+
+   RATIO 5x. On an axis that starts at $0, the same percentage move is drawn
+   exactly (max/min) times bigger at the top of the plot than at the bottom —
+   the distortion factor IS the ratio. At 5x the whole early history is inside
+   the bottom fifth of the plot and a 20% fall down there is under 4% of the
+   plot's height. Below 5x the distortion is small enough that the dollar view,
+   which is the honest one about amounts, should be left alone without a note.
+
+   SPAN 120 MONTHS. Ten years. Money left alone at 8% is 2.2x after ten years
+   before a penny of contributions, so a decade is where the compression
+   becomes structural rather than incidental — and it is also the point at
+   which there is more than one market cycle in the picture to compare. */
+const SUGGEST_RATIO  = 5;
+const SUGGEST_MONTHS = 120;
+const SCALE_LABEL = 'Equal % moves, equal size';
+
+let scaleLog = false;
+let SC = null;
+
+/* $10k, $20k, $1.5m. Round human numbers — a log axis puts its ticks where the
+   powers fall, and formatting those verbatim gives $17,782. */
+function compactUsd(v) {
+  const a = Math.abs(v), sign = v < 0 ? '−' : '';
+  const t = x => { const r = Math.round(x * 10) / 10; return r % 1 === 0 ? String(r) : r.toFixed(1); };
+  if (a >= 1e6) return sign + '$' + t(a / 1e6) + 'm';
+  if (a >= 1000) return sign + '$' + t(a / 1000) + 'k';
+  return sign + '$' + nf(Math.round(a));
+}
+
+/* Every value that is actually DRAWN, with the reason any of them blocks the
+   ratio scale. Not every value in the payload: a strategy nobody ticked is not
+   on the chart and has no vote. */
+function plotted() {
+  const vals = [];
+  const bad = [];
+  let badBalance = false, badMoney = false;
+
+  D.observations.forEach(function (o) {
+    vals.push(o.value);
+    if (o.value <= 0 && !badBalance) {
+      badBalance = true;
+      bad.push('your own balance is ' + usd2(o.value) + ' in ' + monthOf(o.date));
+    }
+  });
+  chosen().forEach(function (c) {
+    let flagged = false;
+    c.s.path.forEach(function (v, i) {
+      vals.push(v);
+      if (v <= 0 && !flagged) {
+        flagged = true;
+        bad.push(c.s.label + ' reaches ' + usd2(v) + ' in ' + monthOf(D.months[i]));
+      }
+    });
+  });
+  if (showMoneyIn) {
+    moneyIn.forEach(function (v, i) {
+      vals.push(v);
+      if (v <= 0 && !badMoney) {
+        badMoney = true;
+        bad.push('net contributions are ' + usd2(v) + ' by ' + monthOf(D.months[i]) +
+          ' — more has come out than ever went in');
+      }
+    });
+  }
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i < vals.length; i++) { if (vals[i] < lo) lo = vals[i]; if (vals[i] > hi) hi = vals[i]; }
+  return { min: lo, max: hi, bad: bad };
+}
+
+/* Round numbers, going down. 9,346 becomes 8,000 — the floor is meant to sit
+   under the data and be a figure a person would say out loud. */
+const NICE = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8];
+function niceDown(v) {
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  const m = v / p;
+  let best = NICE[0];
+  for (let i = 0; i < NICE.length; i++) if (NICE[i] <= m + 1e-9) best = NICE[i];
+  return best * p;
+}
+
+/* Log ticks are not evenly spaced, so the set has to be chosen for the height
+   available rather than divided out of it. Take the richest mantissa set whose
+   every gap still clears the minimum, and stop. The sets get coarser, never
+   uglier: each one is a subset of round money figures. */
+const LOG_TIERS = [
+  [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8],
+  [1, 1.5, 2, 3, 5, 7],
+  [1, 2, 3, 5],
+  [1, 2, 5],
+  [1]
+];
+function logTicks(lo, hi, pxPerLn, minGap) {
+  for (let t = 0; t < LOG_TIERS.length; t++) {
+    const out = [];
+    for (let e = Math.floor(Math.log10(lo)); e <= Math.ceil(Math.log10(hi)); e++) {
+      const d = Math.pow(10, e);
+      LOG_TIERS[t].forEach(function (m) {
+        const v = m * d;
+        if (v > lo * 1.000001 && v <= hi && out.indexOf(v) < 0) out.push(v);
+      });
+    }
+    out.sort((a, b) => a - b);
+    if (out.length < 2) continue;
+    let ok = true;
+    for (let i = 1; i < out.length; i++) {
+      if ((Math.log(out[i]) - Math.log(out[i - 1])) * pxPerLn < minGap) { ok = false; break; }
+    }
+    if (ok) return out;
+  }
+  return [];
+}
+
+/* Recomputed on every state change, never on a resize: the floor and the top
+   come from the data alone, so the scale does not shift when the window does. */
+function computeScale() {
+  const p = plotted();
+  const ok = p.bad.length === 0;
+  /* A view that has become impossible cannot stay switched on. This is the one
+     automatic change of scale there is, and it only ever goes towards dollars
+     — nothing here ever switches INTO the ratio scale on the reader's behalf. */
+  const forcedOff = scaleLog && !ok;
+  if (forcedOff) scaleLog = false;
+  const log = scaleLog && ok;
+
+  const top = p.max * 1.07;
+  /* Linear keeps its zero baseline, and drops below it only if the data does
+     — a negative net contribution is drawn where it falls, not clipped at the
+     axis. Ratio takes 7% of headroom under the lowest value drawn and then
+     rounds that down to a round figure. Not zero, and not the FIRST value
+     either: the portfolio dips under its opening balance during 2022, and a
+     floor at the opening balance would push those months off the bottom. */
+  const floor = log ? niceDown(p.min / 1.07) : Math.min(0, p.min * 1.07);
+
+  const ratio = p.min > 0 ? p.max / p.min : Infinity;
+  SC = {
+    log: log, ok: ok, bad: p.bad, min: p.min, max: p.max,
+    floor: floor, top: top, ratio: ratio, forcedOff: forcedOff,
+    suggest: !log && ok && (n >= SUGGEST_MONTHS || ratio >= SUGGEST_RATIO)
+  };
+}
+
+/* The suggestion and the reason share one quiet line under the plot. It sits
+   below the cautions and below the rail at both widths, so it can appear,
+   disappear and rewrite itself without moving a single thing the reader is
+   aiming at. */
+function paintScale() {
+  const btn = document.getElementById('scale-toggle');
+  const note = document.getElementById('scale-note');
+  btn.setAttribute('aria-pressed', String(SC.log));
+  btn.setAttribute('aria-disabled', String(!SC.ok));
+  note.textContent = '';
+
+  const strong = t => { const b = document.createElement('b'); b.textContent = t; return b; };
+  const put = function (kind, parts) {
+    note.setAttribute('data-kind', kind);
+    parts.forEach(function (p) {
+      note.appendChild(typeof p === 'string' ? document.createTextNode(p) : p);
+    });
+  };
+
+  if (!SC.ok) {
+    put('off', [
+      strong('“' + SCALE_LABEL + '” is unavailable for this data. '),
+      'It places values by ratio, and there is no ratio to $0 or to a negative amount: ' +
+      SC.bad.slice(0, 3).join('; ') + '. Nothing has been dropped, clamped or changed to ' +
+      'get around it — every value is still drawn exactly as recorded, on the dollar scale.'
+    ]);
+    return;
+  }
+  if (SC.log) {
+    put('on', [
+      strong('Equal percentage moves are now equal heights. '),
+      'A 20% fall in ' + yearOf(D.months[0]) + ' is the same size on screen as a 20% fall in ' +
+      yearOf(D.months[n - 1]) + '. The axis runs ' + usd(SC.floor) + ' to ' + usd(SC.top) +
+      ' and does not start at $0, so a height here is a proportion and not an amount — ' +
+      'switch it off for dollars, or open the table for the figures.'
+    ]);
+    return;
+  }
+  if (SC.suggest) {
+    const times = SC.ratio >= 10 ? nf(Math.round(SC.ratio)) : String(Math.round(SC.ratio * 10) / 10);
+    put('suggest', [
+      'This history is stretched: the highest value drawn is ' + times + '× the lowest' +
+      (n >= SUGGEST_MONTHS ? ', over ' + Math.round(n / 12) + ' years' : '') +
+      ', so on a $0 baseline the same 20% move is drawn about ' + nf(Math.round(SC.ratio)) +
+      ' times bigger at the top of this plot than at the bottom. ',
+      strong('“' + SCALE_LABEL + '”'),
+      ' evens that out. Dollars stay easier to read here, which is why it is off.'
+    ]);
+    return;
+  }
+  note.removeAttribute('data-kind');
+}
+
+/* The announcement quotes the floor and the top, and those only exist once the
+   new scale has been computed — so the message is built inside update(), after
+   computeScale(), rather than here where SC still describes the old view. */
+let scaleJustChanged = false;
+function scaleAnnouncement() {
+  return SC.log
+    ? 'Vertical scale changed. Equal percentage moves are now drawn as equal heights; the axis runs ' +
+      usd(SC.floor) + ' to ' + usd(SC.top) + ' and no longer starts at zero. Every value is unchanged.'
+    : 'Vertical scale changed. Back to dollars from a $0 baseline; equal dollar amounts are now ' +
+      'equal heights. Every value is unchanged.';
+}
+
+(function wireScale() {
+  const btn = document.getElementById('scale-toggle');
+  btn.addEventListener('click', function () {
+    if (btn.getAttribute('aria-disabled') === 'true') return;
+    scaleLog = !scaleLog;
+    scaleJustChanged = true;
+    update(true);
+  });
+})();
+
 /* ── the chart ──────────────────────────────────────────────────────────── */
 function niceStep(raw) {
   const p = Math.pow(10, Math.floor(Math.log10(raw)));
@@ -1303,14 +1614,50 @@ function render() {
   const plotW = W - M.left - M.right;
   const plotH = H - M.top - M.bottom;
 
-  let dataMax = Math.max.apply(null, D.observations.map(o => o.value));
-  picked.forEach(function (c) { dataMax = Math.max(dataMax, Math.max.apply(null, c.s.path)); });
-  if (showMoneyIn) dataMax = Math.max(dataMax, Math.max.apply(null, moneyIn));
-  const yMax = dataMax * 1.07;
-  const step = niceStep(yMax / 4);
+  if (!SC) computeScale();
+  const yMax = SC.top, yFloor = SC.floor;
+  const yBase = M.top + plotH;
   const x = i => M.left + (n === 1 ? 0 : (i / (n - 1)) * plotW);
-  const y = v => M.top + plotH - (v / yMax) * plotH;
-  geom = { x: x, y: y, M: M, plotW: plotW, plotH: plotH, W: W, H: H, narrow: narrow, tiny: tiny };
+
+  /* One mapping, two shapes. On the ratio scale the floor is strictly below
+     every value drawn, which is what makes the logarithm safe here without a
+     clamp anywhere: nothing is ever pulled up to fit. */
+  let y, ticks, compactTicks;
+  if (SC.log) {
+    const l0 = Math.log(yFloor), k = plotH / (Math.log(yMax) - l0);
+    y = v => yBase - (Math.log(v) - l0) * k;
+    /* 40px between labels: an 11px tick needs about 14px of line box, and
+       three of those is the point at which an uneven ladder stops reading as
+       crowded. The bottom tick is the floor itself and is drawn separately,
+       so anything landing on top of it goes.
+
+       Then, if 40px left fewer than four labels on the axis, ask again at 30.
+       Over a range of several decades the comfortable spacing throws away the
+       whole 1-2-5 ladder and leaves three lonely powers of ten; 30px still
+       clears an 11px label twice over, and the denser ladder is what makes a
+       thirty-year axis readable rather than merely uncluttered. */
+    const pick = g => logTicks(yFloor, yMax, k, g).filter(v => yBase - y(v) > 26);
+    ticks = pick(40);
+    if (ticks.length < 4) { const denser = pick(30); if (denser.length > ticks.length) ticks = denser; }
+    if (ticks.length < 2) {
+      /* A range too narrow for round powers — a log axis over less than half a
+         decade. Fall back to the linear ladder, which is round by construction
+         and, over a range this tight, lands in visibly the right places. */
+      const st = niceStep((yMax - yFloor) / 4);
+      ticks = [];
+      for (let v = Math.ceil(yFloor / st) * st; v <= yMax; v += st) if (v > yFloor) ticks.push(v);
+    }
+    compactTicks = true;
+  } else {
+    y = v => yBase - ((v - yFloor) / (yMax - yFloor)) * plotH;
+    const st = niceStep((yMax - yFloor) / 4);
+    ticks = [];
+    /* `v === 0 ? 0 : v` is not a no-op: the start of this ladder can be a
+       negative zero, and nf(-0) prints "-0". */
+    for (let v = Math.ceil((yFloor - 1e-9) / st) * st; v <= yMax; v += st) ticks.push(v === 0 ? 0 : v);
+    compactTicks = narrow;
+  }
+  geom = { x: x, y: y, M: M, plotW: plotW, plotH: plotH, W: W, H: H, narrow: narrow, tiny: tiny, yBase: yBase };
 
   const old = host.querySelector('svg.chart');
   if (old) old.remove();
@@ -1329,27 +1676,71 @@ function render() {
   svg.appendChild(S('rect', { x: 0, y: 0, width: W, height: H, fill: 'var(--plot-surface)' }));
 
   /* horizontal gridlines + y ticks (recessive, solid hairlines) */
-  for (let v = 0; v <= yMax; v += step) {
+  ticks.forEach(function (v) {
     svg.appendChild(S('line', {
       x1: M.left, x2: M.left + plotW, y1: y(v), y2: y(v),
       stroke: v === 0 ? 'var(--line)' : 'var(--grid)', 'stroke-width': 1
     }));
     svg.appendChild(S('text', {
       class: 'axis-tick', x: M.left - 12, y: y(v) + 4, 'text-anchor': 'end'
-    }, narrow ? (v === 0 ? '$0' : '$' + (v / 1000) + 'k') : '$' + nf(v)));
-  }
+    }, compactTicks ? (v === 0 ? '$0' : compactUsd(v)) : '$' + nf(v)));
+  });
 
-  /* x ticks — years, at January */
-  for (let i = 0; i < n; i++) {
-    if (D.months[i].slice(5, 7) !== '01') continue;
+  /* The baseline, and what it is not. On dollars the $0 line above is the
+     bottom of the plot and it is solid, which is the whole claim. On the ratio
+     scale there is no $0 to draw, so the bottom rule is BROKEN — the
+     conventional mark for an axis that does not start where you expect — the
+     bottom tick carries the floor figure, the word under it says NOT $0, and a
+     caption over the corner gives the range in full. A reader must not be able
+     to look at this and think they are seeing a zero baseline. */
+  if (SC.log) {
     svg.appendChild(S('line', {
-      x1: x(i), x2: x(i), y1: y(0), y2: y(0) + 6,
-      stroke: 'var(--line)', 'stroke-width': 1
+      x1: M.left, x2: M.left + plotW, y1: yBase, y2: yBase,
+      stroke: 'var(--line)', 'stroke-width': 1, 'stroke-dasharray': '3 4'
     }));
     svg.appendChild(S('text', {
-      class: 'axis-tick', x: x(i), y: y(0) + 22, 'text-anchor': 'middle'
-    }, yearOf(D.months[i])));
+      class: 'axis-tick', x: M.left - 12, y: yBase + 4, 'text-anchor': 'end'
+    }, compactUsd(yFloor)));
+    svg.appendChild(S('text', {
+      class: 'axis-floor-note', x: M.left - 12, y: yBase + 16, 'text-anchor': 'end'
+    }, 'NOT $0'));
+    svg.appendChild(S('text', {
+      class: 'axis-caption', x: 0, y: 13, 'text-anchor': 'start'
+    }, tiny
+      ? 'AXIS ' + compactUsd(yFloor) + '–' + compactUsd(yMax) + ' · NOT $0'
+      : 'AXIS ' + compactUsd(yFloor) + ' – ' + compactUsd(yMax) +
+        ' · NOT FROM $0 · EQUAL % MOVES ARE EQUAL HEIGHTS'));
   }
+
+  /* x ticks — years, at January. Every January gets its mark; the LABELS are
+     thinned to whatever fits, because thirty-one of them at 16px apart print
+     on top of each other and the run reads as a grey smear. The stride is a
+     round number of years and lands on round years (2000, 2005, 2010), which
+     is what a reader expects a decade axis to be marked in. */
+  const jans = [];
+  for (let i = 0; i < n; i++) if (D.months[i].slice(5, 7) === '01') jans.push(i);
+  let stride = 1;
+  if (jans.length > 1) {
+    const gap = x(jans[1]) - x(jans[0]);
+    const opts = [1, 2, 5, 10, 25];
+    stride = opts[opts.length - 1];
+    for (let k = 0; k < opts.length; k++) if (gap * opts[k] >= 34) { stride = opts[k]; break; }
+  }
+  jans.forEach(function (i) {
+    svg.appendChild(S('line', {
+      x1: x(i), x2: x(i), y1: yBase, y2: yBase + 6,
+      stroke: 'var(--line)', 'stroke-width': 1
+    }));
+    if (+yearOf(D.months[i]) % stride !== 0) return;
+    /* A label centred on the very first or very last month hangs half of
+       itself outside the plot, into the tick gutter on one side and the end
+       labels on the other. Anchor those two to the axis instead. */
+    const anchor = x(i) - M.left < 18 ? 'start'
+                 : (M.left + plotW) - x(i) < 18 ? 'end' : 'middle';
+    svg.appendChild(S('text', {
+      class: 'axis-tick', x: x(i), y: yBase + 22, 'text-anchor': anchor
+    }, yearOf(D.months[i])));
+  });
 
   /* contributions & withdrawals — context, drawn first and beneath everything. A stone
      wash from zero under a hairline, stepped: flat between the dates money
@@ -1362,9 +1753,16 @@ function render() {
       step.push(x(i) + ',' + y(moneyIn[i - 1]));
       step.push(x(i) + ',' + y(moneyIn[i]));
     }
+    /* The baseline of the wash is the AXIS floor, whatever the axis floor is
+       — $0 on dollars, and the round figure just under the lowest value drawn
+       on the ratio scale. Not zero on a scale that has no zero, and not the
+       first value either. The top edge is the part that carries the meaning
+       (everything under it is the reader's own money); the baseline is only
+       where the shading stops, and filling the empty space beneath the data
+       would be shading nothing. */
     svg.appendChild(S('polygon', {
       fill: 'var(--floor-fill)', stroke: 'none',
-      points: x(0) + ',' + y(0) + ' ' + step.join(' ') + ' ' + x(n - 1) + ',' + y(0)
+      points: x(0) + ',' + yBase + ' ' + step.join(' ') + ' ' + x(n - 1) + ',' + yBase
     }));
     svg.appendChild(S('polyline', {
       fill: 'none', stroke: 'var(--floor-line)', 'stroke-width': 1,
@@ -1615,9 +2013,15 @@ function showAt(i) {
   let left = cx * scale + 16;
   if (left + tw > host.clientWidth) left = cx * scale - tw - 16;
   left = Math.max(0, Math.min(host.clientWidth - tw, left));
-  const anchorV = youV === null ? (picked.length ? picked[0].s.path[i] : 0) : youV;
-  let top = g.y(anchorV) * scale - th - 14;
-  if (top < 0) top = g.y(anchorV) * scale + 18;
+  /* Anchor on a value that is actually drawn. The old fallback was 0, which is
+     a real position on the dollar scale and no position at all on the ratio
+     one; with nothing else on the chart the bottom of the plot is the answer. */
+  const anchorV = youV === null
+    ? (picked.length ? picked[0].s.path[i] : (showMoneyIn ? moneyIn[i] : null))
+    : youV;
+  const anchorY = anchorV === null ? g.yBase : g.y(anchorV);
+  let top = anchorY * scale - th - 14;
+  if (top < 0) top = anchorY * scale + 18;
   top = Math.max(0, Math.min(g.H * scale - th, top));
   tip.style.left = left + 'px';
   tip.style.top = top + 'px';
@@ -1725,7 +2129,12 @@ function buildTable() {
 
 /* ── one update path for every state change ─────────────────────────────── */
 function update(announce, msg) {
+  /* First, because everything below reads it: the gate, the floor and the
+     suggestion all depend on what is about to be drawn. */
+  computeScale();
+  if (scaleJustChanged) { scaleJustChanged = false; msg = scaleAnnouncement(); }
   paintRefs();
+  paintScale();
   paintCautions();
   paintCopy();
   paintFoot();
@@ -1734,6 +2143,14 @@ function update(announce, msg) {
   swap = !!announce;
   render();
   swap = false;
+  if (SC.forcedOff) {
+    /* The reader did not ask for this, so they are told. It happens when a
+       newly drawn series brings a $0 or a negative value onto the chart. */
+    announce = true;
+    msg = 'The ratio scale is no longer available for what is now on the chart, so the ' +
+      'vertical scale is back to dollars. ' + SC.bad[0] + '. No value has been changed.';
+    SC.forcedOff = false;
+  }
   if (announce) {
     const c = chosen();
     document.getElementById('sel-live').textContent = msg || (c.length

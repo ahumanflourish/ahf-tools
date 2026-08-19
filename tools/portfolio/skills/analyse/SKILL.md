@@ -70,9 +70,24 @@ Confirm all of the following and show the user the summary:
 - No balance dated before the first contribution, unless the user confirms it is
   an opening balance.
 - Every date parses, every amount is a number, no negatives.
-- The earliest date is on or after **2021-10**. Earlier histories are not yet
-  supported — the monthly benchmark series does not reach back further. Say this
-  plainly and offer to analyse the covered portion.
+- The history starts on or after the earliest date the **chosen reference
+  strategies** support. This is not one fixed date, and hard-coding one is wrong:
+
+  | Reference | Monthly data from |
+  |---|---|
+  | US stock market, S&P 500, All bonds | **1996-01** |
+  | Global stock market, Global 80/20, Global 60/40 | **2010-01** |
+  | Target-date 2060 fund | **2021-10** |
+
+  So a 1998 history works fine against the US market, and fails only if a global
+  or target-date reference is selected. Do not tell someone their history is too
+  long when the truth is that one of their chosen benchmarks is too young.
+
+  Ask the dashboard rather than guessing: `benchmarkCoverage(data, strategies)`
+  returns the real window for the selected set, and `analyse()` throws a typed
+  `AnalysisError` with `code: 'history-before-coverage'` (or `-after-`) carrying
+  `earliestSupported` and the covered range. Report those values, and offer to
+  analyse the covered portion or to drop the reference that is limiting it.
 
 Then state the totals back: total contributed, total withdrawn, number of
 balance observations, first and last date. Ask them to confirm before you

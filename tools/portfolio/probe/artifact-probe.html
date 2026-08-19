@@ -1,0 +1,97 @@
+<div id="app" style="font-family:ui-monospace,monospace;font-size:13px;line-height:1.6;padding:16px;max-width:820px">
+  <h2 style="font-family:system-ui;margin:0 0 4px">Messages API probe</h2>
+  <p style="font-family:system-ui;color:#555;margin:0 0 14px">
+    Four questions that decide the design of the extraction path. Click run.
+  </p>
+  <button id="go" style="font:600 13px system-ui;padding:8px 14px;cursor:pointer">Run all probes</button>
+  <pre id="out" style="white-space:pre-wrap;margin-top:16px"></pre>
+</div>
+<script type="module">
+const out = document.getElementById('out');
+const log = (s) => { out.textContent += s + "\n"; };
+
+// The call shape under test: no x-api-key, no anthropic-version.
+// The claude.ai proxy is expected to inject both and bill the viewer.
+async function call(body) {
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const text = await r.text();
+  let json = null;
+  try { json = JSON.parse(text); } catch {}
+  return { status: r.status, json, text };
+}
+
+const TINY_PDF = "JVBERi0xLjQKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PgplbmRvYmoKMiAwIG9iago8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PgplbmRvYmoKMyAwIG9iago8PC9UeXBlL1BhZ2UvUGFyZW50IDIgMCBSL01lZGlhQm94WzAgMCA5OSA5OV0+PgplbmRvYmoKdHJhaWxlcgo8PC9Sb290IDEgMCBSPj4K";
+const TINY_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+const probes = [
+  ["1. model: claude-sonnet-5 accepted?", {
+    model: "claude-sonnet-5", max_tokens: 16,
+    messages: [{ role: "user", content: "Reply with the single word: ok" }],
+  }],
+  ["2. structured outputs (output_config.format)?", {
+    model: "claude-sonnet-5", max_tokens: 128,
+    messages: [{ role: "user", content: "One row: 2024-01-15, a contribution of 1000 dollars." }],
+    output_config: { format: { type: "json_schema", schema: {
+      type: "object", additionalProperties: false,
+      required: ["rows"],
+      properties: { rows: { type: "array", items: {
+        type: "object", additionalProperties: false,
+        required: ["date","type","amount"],
+        properties: {
+          date:   { type: "string" },
+          type:   { type: "string", enum: ["contribution","withdrawal","balance"] },
+          amount: { type: "number" },
+        } } } },
+    } } },
+  }],
+  ["3a. base64 document (PDF) block?", {
+    model: "claude-sonnet-5", max_tokens: 32,
+    messages: [{ role: "user", content: [
+      { type: "document", source: { type: "base64", media_type: "application/pdf", data: TINY_PDF } },
+      { type: "text", text: "How many pages? Answer with a number." },
+    ] }],
+  }],
+  ["3b. base64 image block?", {
+    model: "claude-sonnet-5", max_tokens: 32,
+    messages: [{ role: "user", content: [
+      { type: "image", source: { type: "base64", media_type: "image/png", data: TINY_PNG } },
+      { type: "text", text: "Reply with the single word: seen" },
+    ] }],
+  }],
+  ["4. fallback model claude-sonnet-4-6 + structured outputs?", {
+    model: "claude-sonnet-4-6", max_tokens: 128,
+    messages: [{ role: "user", content: "One row: 2024-01-15, a contribution of 1000 dollars." }],
+    output_config: { format: { type: "json_schema", schema: {
+      type: "object", additionalProperties: false, required: ["rows"],
+      properties: { rows: { type: "array", items: { type: "object" } } },
+    } } },
+  }],
+];
+
+document.getElementById('go').onclick = async () => {
+  out.textContent = "";
+  for (const [label, body] of probes) {
+    log("── " + label);
+    try {
+      const { status, json, text } = await call(body);
+      log("   HTTP " + status);
+      if (json?.error) log("   ERROR " + json.error.type + ": " + json.error.message);
+      else if (json?.content) {
+        log("   stop_reason: " + json.stop_reason);
+        log("   content: " + JSON.stringify(json.content).slice(0, 300));
+      } else {
+        // Q4: a logged-out response may be HTML rather than JSON. Record which.
+        log("   NON-JSON BODY (first 200 chars): " + text.slice(0, 200).replace(/\n/g, " "));
+      }
+    } catch (e) {
+      log("   THREW: " + e.name + " — " + e.message + "   (a CSP block looks like this)");
+    }
+    log("");
+  }
+  log("Done. Copy everything above.");
+};
+</script>
