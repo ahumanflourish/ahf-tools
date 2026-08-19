@@ -63,38 +63,23 @@ export function runFixture(): AnalysisResult {
   return core.analyse(fixture.input, benchmarks, strategies, referenceId);
 }
 
-export const {
-  analyse,
-  deriveFindings,
-  impliedUsMarketWeight,
-  FALLBACK_US_MARKET_WEIGHT,
-  REGIONAL_TILT_THRESHOLD,
-  embeddedExpenseRatio,
-  extraDrag,
-  resolveExpenseRatio,
-  buildStrategySeries,
-  replay,
-  findFlowFreeWindows,
-  xirr,
-  modifiedDietz,
-  toDate,
-  ym,
-  daysBetween,
-  yearsBetween,
-  monthRange,
-  monthEnd,
-} = core;
-
-export type {
-  InputRow,
-  Holding,
-  PortfolioInput,
-  BenchmarkData,
-  StrategyDef,
-  StrategyResult,
-  FundRef,
-  ExpenseRatio,
-  Finding,
-  MarketWeight,
-  AnalysisResult,
-} from '../../core/src/index';
+/**
+ * The whole core surface, re-exported wholesale.
+ *
+ * DELIBERATELY A STAR, NOT A LIST. This file used to name each symbol by hand,
+ * and the list went stale: `AnalysisError`, `benchmarkCoverage`,
+ * `classifyGranularity`, `dataQualityWarnings`, `GRANULARITY_MAX_INTERVAL` and
+ * `DEFAULT_MARKET_WEIGHT_WINDOW` were all reachable in the ESM library and all
+ * sitting inside the bundle, and none of them were on the global — so the
+ * offline page and the artifact payload could run an analysis but could not
+ * catch its error, ask what the supported window was, or regenerate a single
+ * line of the data-quality copy. Every one of those is exactly what a review
+ * table and every error path need.
+ *
+ * A star export cannot drift: `src/index.ts` is the one place the public
+ * surface is decided, and this target now has it by construction rather than
+ * by transcription. The four locals above (`benchmarks`, `strategies`,
+ * `referenceId`, `fixture`) and `runFixture` are additions to that surface,
+ * not overrides — no name here collides with one in core.
+ */
+export * from '../../core/src/index';
