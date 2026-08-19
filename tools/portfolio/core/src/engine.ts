@@ -840,6 +840,272 @@ export function dataQualityWarnings(args: {
   return out;
 }
 
+// ─────────────────────────────────────────── describing the input on its own
+
+/** A `balance` row, parsed. */
+interface BalancePoint {
+  date: Date;
+  value: number;
+}
+
+/** A flow row, parsed and signed: positive in, negative out. */
+interface FlowPoint {
+  date: Date;
+  amount: number;
+}
+
+/** `YYYY-MM` as a monotonic integer, so gaps are a subtraction. */
+const monthIndex = (mk: string): number => {
+  const [y, m] = mk.split('-').map(Number);
+  return y * 12 + (m - 1);
+};
+
+/**
+ * Is this a real calendar date, written the one way the schema allows?
+ *
+ * `Date` is not a validator: `new Date('2024-02-30T00:00:00Z')` silently rolls
+ * over to 1 March, and `new Date('2024-1T00:00:00Z')` is Invalid. The
+ * round-trip catches both — a date only survives if it parses AND writes back
+ * out as the same ten characters.
+ */
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+function isCalendarDate(value: string): boolean {
+  if (typeof value !== 'string' || !ISO_DATE.test(value)) return false;
+  const d = toDate(value);
+  return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === value;
+}
+
+/**
+ * Split rows into the two series everything downstream measures.
+ *
+ * Rows whose date is not a real calendar date are dropped rather than carried:
+ * `describeInput` is called on every keystroke of a half-typed table, where
+ * `2024-1` and `2024-02-30` are ordinary intermediate states, and one of them
+ * reaching `Date#toISOString` would throw while the other would quietly move a
+ * row to a different month. What the user must fix is the table's job to say —
+ * per the flow plan the date checks are inline, deterministic and pre-engine —
+ * and it says it from the raw rows, not from this. `analyse` shares the filter
+ * so the two never disagree about which rows exist; every row of every valid
+ * input survives it untouched, the schema having required this exact format
+ * all along.
+ */
+function partitionRows(rows: InputRow[]): { balances: BalancePoint[]; flows: FlowPoint[] } {
+  const usable = (Array.isArray(rows) ? rows : []).filter(
+    (r): r is InputRow => r != null && isCalendarDate(r.date));
+
+  const flows = usable
+    .filter((r): r is Extract<InputRow, { type: 'contribution' | 'withdrawal' }> =>
+      r.type === 'contribution' || r.type === 'withdrawal')
+    .map((r) => ({
+      date: toDate(r.date),
+      amount: r.type === 'contribution' ? Math.abs(r.amount) : -Math.abs(r.amount),
+    }))
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  const balances = usable
+    .filter((r) => r.type === 'balance')
+    .map((r) => ({ date: toDate(r.date), value: r.amount }))
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  return { balances, flows };
+}
+
+/** A measured year, with the two balances that bound it kept alongside. */
+interface MeasuredPeriod {
+  year: string;
+  start: BalancePoint;
+  end: BalancePoint;
+  info: PeriodInfo;
+}
+
+/**
+ * The calendar years that have both an opening and a closing balance.
+ *
+ * The opening balance is the last one in the PREVIOUS year when there is one,
+ * so a full year runs year-end to year-end; failing that it is the first in
+ * this year, which is what makes the first year a stub. A year with a single
+ * balance and none before it yields nothing — there is no window to measure —
+ * and `dataQualityWarnings` says so out loud.
+ *
+ * `start`/`end` travel with the record because `analyse` needs their VALUES
+ * for Modified Dietz while `describeInput` needs only the window. Returning
+ * both from one pass is what stops the selection rule existing twice.
+ */
+function measuredPeriods(balances: BalancePoint[]): MeasuredPeriod[] {
+  const out: MeasuredPeriod[] = [];
+  const years = [...new Set(balances.map((b) => b.date.getUTCFullYear()))];
+  for (const y of years) {
+    const s = balances.filter((b) => b.date.getUTCFullYear() === y - 1).pop()
+           ?? balances.find((b) => b.date.getUTCFullYear() === y);
+    const e = balances.filter((b) => b.date.getUTCFullYear() === y).pop();
+    if (!s || !e || s.date >= e.date) continue;
+    const days = daysBetween(s.date, e.date);
+    out.push({
+      year: String(y),
+      start: s,
+      end: e,
+      info: {
+        start: s.date.toISOString().slice(0, 10),
+        end: e.date.toISOString().slice(0, 10),
+        days,
+        partial: days < FULL_PERIOD_DAYS,
+      },
+    });
+  }
+  return out;
+}
+
+/**
+ * `DataQuality` as it can be known from the rows alone.
+ *
+ * Identical to `DataQuality` except that the two dates are nullable, because
+ * an empty table has no span. `analyse` narrows them back the moment it has
+ * proved there are at least two balances, so `AnalysisResult.dataQuality`
+ * keeps the shape every existing consumer already reads.
+ */
+export interface InputDataQuality extends Omit<DataQuality, 'firstDate' | 'lastDate'> {
+  /** ISO date the measured span opens on. Null only when there are no rows. */
+  firstDate: string | null;
+  /** ISO date the measured span closes on. Null only when there are no rows. */
+  lastDate: string | null;
+}
+
+/** Everything a set of rows can be told about itself. */
+export interface InputDescription {
+  /**
+   * Per-year measured windows, keyed by year — byte-for-byte what
+   * `AnalysisResult.periods` carries for the same rows.
+   */
+  periods: Record<string, PeriodInfo>;
+  /**
+   * Density, span, cadence and the warning copy — byte-for-byte what
+   * `AnalysisResult.dataQuality` carries for the same rows, with nullable
+   * dates for the degenerate inputs `analyse` refuses.
+   */
+  dataQuality: InputDataQuality;
+}
+
+/**
+ * Describe a set of input rows without analysing them.
+ *
+ * WHY THIS IS SEPARATE. The review table has to tell the user what their data
+ * looks like WHILE THEY ARE TYPING it: before a benchmark is chosen, before a
+ * strategy is selected, and — the case that forces the split — before the
+ * history is long enough or the coverage right for `analyse` to return at all.
+ * Everything in the descriptive block is a fact about the rows: the balance
+ * and flow counts, the per-year windows, the months observed inside the span,
+ * the largest hole, the cadence that follows from those two, and every one of
+ * the six warning families in `dataQualityWarnings`. None of it reads the
+ * benchmark data, the strategy catalogue, the fee, or the clock, so none of it
+ * needs to wait for a run that may never be legal.
+ *
+ * `analyse` calls this rather than repeating it, which is the only way the
+ * live note and the results page cannot drift apart.
+ *
+ * IT DOES NOT THROW. Zero rows, one balance, a history that opens decades
+ * before the benchmark data, a half-typed date — all of these are ordinary
+ * states of a table being filled in, and every one of them returns a
+ * description. The three refusals that are genuinely `analyse`'s
+ * (`insufficient-balances`, `no-invested-capital`, and the two coverage
+ * codes) stay there, because two of them need data this function is
+ * deliberately not given and the other two are about whether a RESULT can be
+ * computed, not about what the rows say.
+ *
+ * WHAT DEGENERATE INPUT RETURNS. The counts, the dates and the cadence are
+ * always real. The warnings are suppressed below two balance rows: every
+ * string in that list is a statement about a measurable history, and with
+ * nothing to measure they degrade into noise — "Balances cover 0 of the 0
+ * months in this period" for an empty table, and a complaint that no
+ * year-by-year return could be measured from a single row the user is still
+ * mid-way through typing. The honest signal at that point is `balanceCount`
+ * itself, which the table already gates compute on. The rule is unreachable
+ * from `analyse`, which refuses the same inputs one step earlier.
+ */
+export function describeInput(rows: InputRow[]): InputDescription {
+  const { balances, flows } = partitionRows(rows);
+
+  // The span. Anchored on the balances, exactly as `analyse` anchors it: the
+  // history opens at the first balance unless a flow predates it, and always
+  // closes at the last balance, because that is the valuation the answer is
+  // measured to. With no balances at all there is nothing to close on, so the
+  // flow dates stand in — enough for a summary line, and never reached from
+  // `analyse`.
+  const firstPoint = balances.length
+    ? (flows.length && flows[0].date < balances[0].date ? flows[0].date : balances[0].date)
+    : (flows.length ? flows[0].date : null);
+  const lastPoint = balances.length
+    ? balances[balances.length - 1].date
+    : (flows.length ? flows[flows.length - 1].date : null);
+
+  const spanMonths = firstPoint && lastPoint
+    ? monthRange(ym(firstPoint), ym(lastPoint)).length
+    : 0;
+
+  const measured = measuredPeriods(balances);
+  const periods: Record<string, PeriodInfo> = {};
+  for (const p of measured) periods[p.year] = p.info;
+
+  const observedMonthKeys = [...new Set(balances.map((b) => ym(b.date)))].sort();
+  const observedMonths = observedMonthKeys.length;
+  let largestGapMonths = 0;
+  for (let i = 1; i < observedMonthKeys.length; i++) {
+    const gap = monthIndex(observedMonthKeys[i]) - monthIndex(observedMonthKeys[i - 1]);
+    if (gap > largestGapMonths) largestGapMonths = gap;
+  }
+  const granularity = classifyGranularity(observedMonths, spanMonths);
+
+  const balanceBeforeFirstFlow =
+    balances.length > 0 && flows.length > 0 && balances[0].date < flows[0].date
+      ? balances[0].date.toISOString().slice(0, 10)
+      : null;
+
+  // Same rule as `analyse`'s `openingPosition`, reduced to the date the
+  // warning copy needs: the first balance is opening capital when no flow
+  // predates it and it is greater than zero.
+  const opensBeforeFirstFlow =
+    balances.length > 0 && (flows.length === 0 || balances[0].date < flows[0].date);
+  const openingPositionDate =
+    opensBeforeFirstFlow && balances[0].value > 0
+      ? balances[0].date.toISOString().slice(0, 10)
+      : null;
+
+  const warnings = balances.length >= 2
+    ? dataQualityWarnings({
+        granularity,
+        observedMonths,
+        spanMonths,
+        largestGapMonths,
+        periods,
+        balanceYears: [...new Set(balances.map((b) => b.date.getUTCFullYear()))],
+        flowDates: flows.map((f) => f.date),
+        openingPositionDate,
+        hasFlows: flows.length > 0,
+        balanceBeforeFirstFlow,
+        firstFlowDate: flows.length ? flows[0].date.toISOString().slice(0, 10) : null,
+      })
+    : [];
+
+  return {
+    periods,
+    dataQuality: {
+      balanceCount: balances.length,
+      observedMonths,
+      spanMonths,
+      // Guarded only for the empty table: `analyse` never sees a zero span,
+      // so this is `observedMonths / spanMonths` there exactly as before.
+      coverage: spanMonths > 0 ? observedMonths / spanMonths : 0,
+      largestGapMonths,
+      flowCount: flows.length,
+      balanceBeforeFirstFlow,
+      granularity,
+      firstDate: firstPoint ? firstPoint.toISOString().slice(0, 10) : null,
+      lastDate: lastPoint ? lastPoint.toISOString().slice(0, 10) : null,
+      warnings,
+    },
+  };
+}
+
+
 // ──────────────────────────────────────────────── input validation & coverage
 
 /**
@@ -1202,14 +1468,9 @@ export function analyse(
    */
   now: Date = new Date(),
 ): AnalysisResult {
-  const flows = input.rows
-    .filter((r): r is Extract<InputRow, { type: 'contribution' | 'withdrawal' }> =>
-      r.type === 'contribution' || r.type === 'withdrawal')
-    .map((r) => ({
-      date: toDate(r.date),
-      amount: r.type === 'contribution' ? Math.abs(r.amount) : -Math.abs(r.amount),
-    }))
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
+  // The same split `describeInput` runs on, from the same helper, so the two
+  // can never disagree about which rows exist or how they sort.
+  const { balances, flows } = partitionRows(input.rows);
 
   // Validated before anything expensive runs, and loudly rather than by
   // falling back: a user who typed 75 for 0.75% has asked a different question
@@ -1226,11 +1487,6 @@ export function analyse(
       );
     }
   }
-
-  const balances = input.rows
-    .filter((r) => r.type === 'balance')
-    .map((r) => ({ date: toDate(r.date), value: r.amount }))
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
 
   // INTERACTION.md, "Error and edge states": fewer than two balance rows
   // cannot be computed, and the copy must explain the minimum — one starting
@@ -1249,6 +1505,15 @@ export function analyse(
       { balanceCount: balances.length },
     );
   }
+
+  /**
+   * Everything the ROWS alone say — periods, density, cadence, warnings.
+   *
+   * Computed here rather than inline so that the review table, which must show
+   * the same figures and the same warning copy while the user is still typing,
+   * runs the identical code path. Nothing below recomputes any of it.
+   */
+  const described = describeInput(input.rows);
 
   /**
    * Capital that was already invested when the history opens, as opposed to
@@ -1372,27 +1637,19 @@ export function analyse(
                   { date: last, amount: endingValue }];
   const yourXirr = xirr(yourCF);
 
+  // Window actually measured for each year. Kept because the first and last
+  // are typically stubs, and because the reference strategies below must be
+  // compounded over exactly these windows to be comparable. The windows are
+  // `describeInput`'s — the same object the review table renders — and the
+  // balances that bound them come back from the same selection pass, so the
+  // rule that picks them exists once.
+  const periods = described.periods;
+
   // annual returns for the user, Modified Dietz
   const yourAnnual: Record<string, number> = {};
-  // Window actually measured for each of those years. Recorded because the
-  // first and last are typically stubs, and because the reference strategies
-  // below must be compounded over exactly these windows to be comparable.
-  const periods: Record<string, PeriodInfo> = {};
-  const years = [...new Set(balances.map((b) => b.date.getUTCFullYear()))];
-  for (const y of years) {
-    const s = balances.filter((b) => b.date.getUTCFullYear() === y - 1).pop()
-           ?? balances.find((b) => b.date.getUTCFullYear() === y);
-    const e = balances.filter((b) => b.date.getUTCFullYear() === y).pop();
-    if (!s || !e || s.date >= e.date) continue;
-    const yf = flows.filter((f) => f.date > s.date && f.date <= e.date);
-    yourAnnual[String(y)] = modifiedDietz(s.value, e.value, yf, s.date, e.date);
-    const days = daysBetween(s.date, e.date);
-    periods[String(y)] = {
-      start: s.date.toISOString().slice(0, 10),
-      end: e.date.toISOString().slice(0, 10),
-      days,
-      partial: days < FULL_PERIOD_DAYS,
-    };
+  for (const p of measuredPeriods(balances)) {
+    const yf = flows.filter((f) => f.date > p.start.date && f.date <= p.end.date);
+    yourAnnual[p.year] = modifiedDietz(p.start.value, p.end.value, yf, p.start.date, p.end.date);
   }
 
   const results: StrategyResult[] = strategies.map((def) => {
@@ -1503,49 +1760,6 @@ export function analyse(
 
   const findings = deriveFindings(input, you, ref, capture, marketWeight, periods, now);
 
-  // Data quality is measured in MONTHS OBSERVED, not balance rows: two
-  // balances inside one month are one month of evidence, and the span they sit
-  // in is what the chart draws. `balanceCount` still reports rows, because
-  // that is what the user typed and the two are worth being able to compare.
-  const spanMonths = months.length;
-  const observedMonthKeys = [...new Set(balances.map((b) => ym(b.date)))].sort();
-  const observedMonths = observedMonthKeys.length;
-  const monthIndex = (mk: string): number => {
-    const [y, m] = mk.split('-').map(Number);
-    return y * 12 + (m - 1);
-  };
-  let largestGapMonths = 0;
-  for (let i = 1; i < observedMonthKeys.length; i++) {
-    const gap = monthIndex(observedMonthKeys[i]) - monthIndex(observedMonthKeys[i - 1]);
-    if (gap > largestGapMonths) largestGapMonths = gap;
-  }
-  const granularity = classifyGranularity(observedMonths, spanMonths);
-
-  // INTERACTION.md: "Balance dated before first contribution — ask whether
-  // that's an opening balance; offer to convert it." Both halves belong to the
-  // UI, but it cannot ask what it has not been told, and until it asks, the
-  // engine is measuring a return on capital it never saw arrive. Reported as a
-  // date rather than a boolean so the question can name the row.
-  const balanceBeforeFirstFlow =
-    flows.length > 0 && balances[0].date < flows[0].date
-      ? balances[0].date.toISOString().slice(0, 10)
-      : null;
-
-  const warnings = dataQualityWarnings({
-    granularity,
-    observedMonths,
-    spanMonths,
-    largestGapMonths,
-    periods,
-    balanceYears: [...new Set(balances.map((b) => b.date.getUTCFullYear()))],
-    flowDates: flows.map((f) => f.date),
-    openingPositionDate:
-      openingPosition > 0 ? balances[0].date.toISOString().slice(0, 10) : null,
-    hasFlows: flows.length > 0,
-    balanceBeforeFirstFlow,
-    firstFlowDate: flows.length ? flows[0].date.toISOString().slice(0, 10) : null,
-  });
-
   return {
     netContributed, grossContributed, grossWithdrawn, endingValue,
     gain: endingValue - investedBase,
@@ -1554,18 +1768,17 @@ export function analyse(
     flowFreeWindows: findFlowFreeWindows(balances, flows),
     findings,
     marketWeight,
+    // Measured in MONTHS OBSERVED, not balance rows: two balances inside one
+    // month are one month of evidence, and the span they sit in is what the
+    // chart draws. `balanceCount` still reports rows, because that is what the
+    // user typed and the two are worth being able to compare. Every field of
+    // it comes from `describeInput`, unaltered — the only difference is that
+    // the two dates are known to exist here, the `insufficient-balances` guard
+    // above having proved there is a span.
     dataQuality: {
-      balanceCount: balances.length,
-      observedMonths,
-      spanMonths,
-      coverage: observedMonths / spanMonths,
-      largestGapMonths,
-      flowCount: flows.length,
-      balanceBeforeFirstFlow,
-      granularity,
-      firstDate: first.toISOString().slice(0, 10),
-      lastDate: last.toISOString().slice(0, 10),
-      warnings,
+      ...described.dataQuality,
+      firstDate: described.dataQuality.firstDate as string,
+      lastDate: described.dataQuality.lastDate as string,
     },
   };
 }

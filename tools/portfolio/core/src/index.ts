@@ -15,6 +15,10 @@ export {
   // benchmark window that decides two of its four codes
   AnalysisError,
   benchmarkCoverage,
+  // input description — everything a set of rows says about itself, with no
+  // benchmark data, no strategy selection and no analysis. `analyse` calls it;
+  // the review table calls it on every keystroke.
+  describeInput,
   // data quality — the classifier and the warning copy, exported so a UI can
   // recompute both after the user edits the review table
   classifyGranularity,
@@ -59,6 +63,8 @@ export type {
   PeriodInfo,
   Granularity,
   DataQuality,
+  InputDataQuality,
+  InputDescription,
   Finding,
   MarketWeight,
   AnalysisResult,
