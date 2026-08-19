@@ -1524,7 +1524,7 @@ function paintScale() {
 
   if (!SC.ok) {
     put('off', [
-      strong('“' + SCALE_LABEL + '” is unavailable for this data. '),
+      strong(SCALE_LABEL + ' is unavailable for this data. '),
       'It places values by ratio, and there is no ratio to $0 or to a negative amount: ' +
       SC.bad.slice(0, 3).join('; ') + '. Nothing has been dropped, clamped or changed to ' +
       'get around it — every value is still drawn exactly as recorded, on the dollar scale.'
@@ -1548,8 +1548,8 @@ function paintScale() {
       (n >= SUGGEST_MONTHS ? ', over ' + Math.round(n / 12) + ' years' : '') +
       ', so on a $0 baseline the same 20% move is drawn about ' + nf(Math.round(SC.ratio)) +
       ' times bigger at the top of this plot than at the bottom. ',
-      strong('“' + SCALE_LABEL + '”'),
-      ' evens that out. Dollars stay easier to read here, which is why it is off.'
+      strong(SCALE_LABEL),
+      ' evens that out. Dollars are still the easier thing to read for an amount, which is why the chart starts in them.'
     ]);
     return;
   }
@@ -1571,7 +1571,14 @@ function scaleAnnouncement() {
 (function wireScale() {
   const btn = document.getElementById('scale-toggle');
   btn.addEventListener('click', function () {
-    if (btn.getAttribute('aria-disabled') === 'true') return;
+    if (btn.getAttribute('aria-disabled') === 'true') {
+      /* Pressing it does nothing to the chart, but it should not do nothing at
+         all. On a phone the reason sits below the picker — the same place a
+         caution sits, for the same reason — so bring it into view. Scrolling
+         moves the viewport; it does not move the layout. */
+      document.getElementById('scale-note').scrollIntoView({ block: 'nearest' });
+      return;
+    }
     scaleLog = !scaleLog;
     scaleJustChanged = true;
     update(true);
@@ -2147,8 +2154,8 @@ function update(announce, msg) {
     /* The reader did not ask for this, so they are told. It happens when a
        newly drawn series brings a $0 or a negative value onto the chart. */
     announce = true;
-    msg = 'The ratio scale is no longer available for what is now on the chart, so the ' +
-      'vertical scale is back to dollars. ' + SC.bad[0] + '. No value has been changed.';
+    msg = 'Vertical scale changed. Equal percentage moves cannot be drawn as equal heights when a ' +
+      'value is $0 or negative, and ' + SC.bad[0] + ', so this is back to dollars. Every value is unchanged.';
     SC.forcedOff = false;
   }
   if (announce) {

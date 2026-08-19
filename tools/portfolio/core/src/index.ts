@@ -50,6 +50,45 @@ export {
   monthEnd,
 } from './engine';
 
+export {
+  // CSV / pasted-text parsing (Path B, and the landing surface for Path C)
+  parseRows,
+  splitFields,
+  parseAmount,
+  scanDate,
+  resolveType,
+} from './parse';
+
+export type {
+  ParseResult,
+  ParseOptions,
+  ParseOutcome,
+  ParsedRow,
+  ParseAmbiguity,
+  ParseAssumptions,
+  ParseStats,
+  SkippedLine,
+  SkipReason,
+  IgnoredLine,
+  AmbiguityExample,
+  Delimiter,
+  DateFormatName,
+} from './parse';
+
+export {
+  // internal-transfer detection — INTERACTION.md, review table
+  findMatchedFlows,
+  TRANSFER_WINDOW_DAYS,
+  TRANSFER_ABS_TOLERANCE,
+  TRANSFER_REL_TOLERANCE,
+} from './transfers';
+
+export type {
+  MatchedFlow,
+  MatchedLeg,
+  FindMatchedFlowsOptions,
+} from './transfers';
+
 export type {
   AnalysisErrorCode,
   InputRow,
