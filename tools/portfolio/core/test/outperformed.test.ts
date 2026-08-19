@@ -61,14 +61,21 @@ describe('outperformed: the tool can say "you did fine"', () => {
     expect(f.detail).toContain('a few years is a short sample');
   });
 
-  it('is severity `info`, which is in tension with "do not bury it"', () => {
-    // Pinned, not endorsed. SPEC.md's findings section says render `notable`
-    // prominently and `info` quietly, and non-negotiable 3 says do not bury
-    // this one — the engine marks it `info`, so following both rules at once
-    // is impossible. That is a copy/severity decision for whoever owns the
-    // findings catalogue, not something a test should quietly change; this
-    // asserts today's value so the decision is made rather than drifted into.
-    expect(find(run(WINNER))!.severity).toBe('info');
+  it('is severity `notable`, so it cannot be rendered quietly', () => {
+    // RESOLVED 2026-08-19. SPEC.md's findings section says render `notable`
+    // prominently and `info` quietly; non-negotiable 3 says of this finding
+    // "do not bury it". While it was `info` those two rules could not both be
+    // followed. The non-negotiable won and SPEC's table was amended to match.
+    //
+    // `notable` is a prominence tier, not a verdict — `size-tilt` is notable
+    // and passes no judgement either. A tool that renders a grievance loudly
+    // and a good result quietly is not neutral; it is just slower to say the
+    // kind thing.
+    expect(find(run(WINNER))!.severity).toBe('notable');
+
+    // The reason this row exists at all: on a clean win it must be the ONLY
+    // finding, so there is nothing louder sitting next to it.
+    expect(run(WINNER).findings.map((f) => f.id)).toEqual(['outperformed']);
   });
 
   it('fires whichever strategy is the reference, when the user beats them all', () => {

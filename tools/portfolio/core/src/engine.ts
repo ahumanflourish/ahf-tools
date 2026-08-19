@@ -1482,7 +1482,14 @@ export function deriveFindings(
   if (capture.forgone <= 0) {
     f.push({
       id: 'outperformed',
-      severity: 'info',
+      /* `notable`, not `info`, deliberately. SPEC's findings table says render
+         `info` quietly, and SPEC non-negotiable 3 says of this finding "do not
+         bury it" — the two rules collide on exactly this row. The non-negotiable
+         wins: a tool that renders a grievance prominently and a good result
+         quietly is not neutral, it is just slow to say the kind thing.
+         `notable` is a prominence tier, not a verdict — `size-tilt` is notable
+         and carries no judgement either. Decided 2026-08-19; SPEC amended. */
+      severity: 'notable',
       title: 'Your strategy beat the passive reference',
       detail:
         `Over this period you finished ahead of the reference strategy. Worth checking whether ` +
