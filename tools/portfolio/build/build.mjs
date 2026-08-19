@@ -37,7 +37,13 @@ const BUILD_DIR = dirname(fileURLToPath(import.meta.url));
 const CORE_DIR = join(BUILD_DIR, '..', 'core');
 const DIST = join(BUILD_DIR, 'dist');
 
-const DATA_FILES = ['benchmarks.json', 'strategies.json', 'fixtures.json'];
+// `glide-path.json` is a data file like the others rather than something
+// core/src/glide.ts imports, so a consumer that never offers a target-date
+// comparison never carries the 28KB table.
+const DATA_FILES = [
+  'benchmarks.json', 'strategies.json', 'fixtures.json', 'glide-path.json',
+  'target-date-costs.json',
+];
 
 /** Shared esbuild settings. `neutral` keeps Node and browser shims out. */
 const COMMON = {
@@ -109,7 +115,8 @@ execFileSync(
    join(BUILD_DIR, 'tsconfig.build.json')],
   { stdio: 'inherit' },
 );
-for (const f of ['index.d.ts', 'engine.d.ts', 'index.d.ts.map', 'engine.d.ts.map']) {
+for (const f of ['index.d.ts', 'engine.d.ts', 'glide.d.ts',
+                 'index.d.ts.map', 'engine.d.ts.map', 'glide.d.ts.map']) {
   const p = join(DIST, 'esm', f);
   const bytes = readFileSync(p);
   emitted.push({

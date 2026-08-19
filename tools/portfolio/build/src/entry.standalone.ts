@@ -23,6 +23,8 @@ import type {
 import benchmarksJson from '../../core/src/data/benchmarks.json';
 import strategiesJson from '../../core/src/data/strategies.json';
 import fixturesJson from '../../core/src/data/fixtures.json';
+import glidePathJson from '../../core/src/data/glide-path.json';
+import targetDateCostsJson from '../../core/src/data/target-date-costs.json';
 
 /** Benchmark monthly series, inlined at build time. */
 export const benchmarks = benchmarksJson as unknown as BenchmarkData;
@@ -30,6 +32,44 @@ export const benchmarks = benchmarksJson as unknown as BenchmarkData;
 /** Strategy definitions, inlined at build time. */
 export const strategies = (strategiesJson as { strategies: unknown[] })
   .strategies as unknown as StrategyDef[];
+
+/**
+ * Vanguard's published Target Retirement glide path, inlined at build time.
+ *
+ * These two targets have no module loader and no fetch, so the table has to
+ * travel with them or `targetDateReference` below could not exist. The ESM
+ * library target deliberately does NOT inline it — there it ships as
+ * `data/glide-path.json` beside `benchmarks.json`, so a site that offers no
+ * target-date comparison does not pay for one.
+ */
+export const glidePath = glidePathJson as unknown as core.GlidePathData;
+
+/**
+ * Published target-date fund expense ratios by provider, inlined at build time.
+ *
+ * For the user who knows WHO their plan is with but not what it costs. Feeds
+ * `PortfolioInput.expenseRatios[id]` through `extraDrag`. It is NOT the user's
+ * own advisor or platform fee — that is `PortfolioInput.feePct`, a different
+ * number answering a different question, and conflating the two would corrupt
+ * the `fee-minority` finding, which asks what share of the gap the user's own
+ * fee explains.
+ */
+export const targetDateCosts = targetDateCostsJson;
+
+/** The copy and costs a constructed target-date reference is built from. */
+export const targetDateTemplate = (strategiesJson as { targetDate: unknown })
+  .targetDate as unknown as core.TargetDateTemplate;
+
+/**
+ * A constructed target-date reference for any retirement year, with the
+ * bundled glide path and catalogue copy already wired in.
+ *
+ * The general case is `targetDateStrategy(year, template, table)`; this is the
+ * one a pasted artifact blob can reach with nothing else loaded.
+ */
+export function targetDateReference(retirementYear: number): StrategyDef {
+  return core.targetDateStrategy(retirementYear, targetDateTemplate, glidePath);
+}
 
 /** Id of the passive reference strategy the capture block is measured against. */
 export const referenceId = (strategiesJson as { defaultReference: string })

@@ -119,6 +119,22 @@ export interface StrategyDef {
   label: string;
   /** Component series id → weight. Weights must sum to 1. */
   weights: Record<string, number>;
+  /**
+   * A TIME-VARYING target, for a strategy whose weights are a glide path
+   * rather than a constant. Given a month key it returns the weights to
+   * rebalance to in that month; `weights` above stays the static,
+   * representative map that every other consumer reads.
+   *
+   * Absent on every shipped catalogue entry and on anything parsed out of
+   * `strategies.json` — a function cannot survive JSON — so the static path is
+   * untouched by its existence. `src/glide.ts` is the only thing that sets it.
+   *
+   * The keys it returns MUST be keys of `weights`. `benchmarkCoverage` decides
+   * the supported window from `weights` alone, so a month asking for a series
+   * nobody declared would walk off the end of the data with the
+   * developer-facing throw instead of the catchable error.
+   */
+  weightsAt?: (monthKey: string) => Record<string, number>;
   /** ADDITIONAL annual drag beyond what is already inside the component series.
    *  Component series are fund total returns, already net of fund expenses,
    *  so this is normally 0 — and 0 throughout the shipped catalogue, which
@@ -140,6 +156,17 @@ export interface StrategyDef {
   explainer: string;
   /** Non-null triggers a visible caution when this strategy is displayed. */
   caution?: string;
+  /**
+   * Non-null means this reference is MODELLED, not a fund's record, and says
+   * in what way. SPEC requires a constructed series be shown as constructed;
+   * this is the field that carries it, and it is rendered under the same rule
+   * as `caution` — whenever the strategy is visible, never behind a tooltip.
+   *
+   * Set only by `targetDateStrategy`. The same sentence is also folded into
+   * that strategy's `caution`, deliberately, so that a UI which has not yet
+   * learned about this field still cannot hide the fact.
+   */
+  constructed?: string;
 }
 
 /**
@@ -480,16 +507,27 @@ export function modifiedDietz(
 /**
  * Blend component series into a single monthly return series, rebalancing
  * to target weights on the given cadence. Returns percent per month.
+ *
+ * The target is normally `def.weights` and constant. A `def.weightsAt` makes
+ * it a function of the month, which is what a glide path is — the strategy
+ * still rebalances on its stated cadence, it just rebalances to somewhere
+ * slightly different each time. Nothing else changes: with `weightsAt` absent
+ * the targets are read once, exactly as before.
  */
 export function buildStrategySeries(
   def: StrategyDef,
   data: BenchmarkData,
   months: string[],
 ): Record<string, number> {
-  const ids = Object.keys(def.weights);
-  const targets = ids.map((id) => def.weights[id]);
-  let bal = [...targets];
   const out: Record<string, number> = {};
+  if (months.length === 0) return out;
+  const ids = Object.keys(def.weights);
+  const targetsAt = (mk: string): number[] => {
+    const w = def.weightsAt ? def.weightsAt(mk) : def.weights;
+    return ids.map((id) => w[id] ?? 0);
+  };
+  const staticTargets = def.weightsAt ? null : targetsAt(months[0]);
+  let bal = [...targetsAt(months[0])];
   const feeMonthly = Math.pow(1 - def.expenseRatio, 1 / 12);
 
   months.forEach((mk, i) => {
@@ -497,6 +535,7 @@ export function buildStrategySeries(
       const isJan = mk.endsWith('-01');
       if ((def.rebalance === 'monthly' && i > 0) || (isJan && i > 0)) {
         const tot = bal.reduce((a, b) => a + b, 0);
+        const targets = staticTargets ?? targetsAt(mk);
         bal = targets.map((w) => tot * w);
       }
     }

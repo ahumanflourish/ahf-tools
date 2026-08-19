@@ -205,5 +205,84 @@
    "explainer": "The whole US investment-grade bond market. Useful as a floor reference."
   }
  ],
- "defaultReference": "GLOBAL_EQUITY"
+ "defaultReference": "GLOBAL_EQUITY",
+ "targetDate": {
+  "_what": "Template for a CONSTRUCTED target-date reference, built for whatever retirement year the user states. Not an entry in `strategies` above, because there is no fixed set of them: `targetDateStrategy(year, thisTemplate, glidePath)` in core/src/glide.ts turns this plus data/glide-path.json into a StrategyDef for any year. The one REAL target-date entry, TARGET_2060, stays in `strategies` unchanged and is preferred wherever its data reaches — see `preferReal`.",
+  "idPrefix": "TARGET_DATE_",
+  "labelTemplate": "Target-date {year} (modelled)",
+  "explainer": "The one-fund plan default: global stocks and bonds in a single holding that shifts toward bonds as {year} approaches. This one is modelled rather than measured — Vanguard's published glide path for a {year} retirement, applied to index returns — because only one real target-date fund is in this tool's data and it only goes back to October 2021.",
+  "constructed": "Modelled, not a fund's record. This is Vanguard's published Target Retirement glide path for {year}, read out of its SEC filings, applied to the US stock, international stock and US bond index series in this tool. Checked against the real Vanguard 2060 fund over October 2021 to July 2026: every calendar year agrees within 11 basis points.",
+  "caution": "Two things this is not. It is not a real fund's record — it is a published glide path applied to index returns, and real target-date funds also hold short-term inflation-linked bonds and hedged international bonds, which this tool has no data for and treats as US bonds. That difference is small decades from retirement and grows as {year} gets close. And it is priced at index-fund cost. In a 401k you get whichever {year} fund the plan offers, and that one can cost several times more — enter its expense ratio to compare against what was actually on your menu.",
+  "expenseRatio": 0,
+  "_expenseRatioNote": "Zero extra drag, as everywhere else in this catalogue, and measured rather than assumed. The component series are already net of their own funds' fees, and those fees are not constant: the ETF classes from 2021-10 (about 4bp on this blend), the dearer investor mutual-fund classes before that (about 15bp). Vanguard's real target-date funds charge 8bp. Topping the blend up to 8bp would be right for the recent window and would double-count for the earlier one. Against the issuer's published calendar-year returns for the whole fund ladder over 2016-2025, zero extra drag lands a mean residual of -5bp a year and a top-up to 8bp lands -9bp.",
+  "funds": [
+   {
+    "series": "US_TOTAL",
+    "basis": "monthly",
+    "name": "Vanguard Total Stock Market ETF",
+    "ticker": "VTI",
+    "expenseRatio": 0.0003,
+    "asOf": "2026-06-30"
+   },
+   {
+    "series": "INTL_TOTAL",
+    "basis": "monthly",
+    "name": "Vanguard Total International Stock ETF",
+    "ticker": "VXUS",
+    "expenseRatio": 0.0005,
+    "asOf": "2026-02-27",
+    "note": "Total Annual Fund Operating Expenses 0.05%, summary prospectus dated 27 February 2026."
+   },
+   {
+    "series": "BOND_TOTAL",
+    "basis": "monthly",
+    "name": "Vanguard Total Bond Market ETF",
+    "ticker": "BND",
+    "expenseRatio": 0.0003,
+    "asOf": "2026-06-30"
+   },
+   {
+    "series": "US_TOTAL",
+    "basis": "annual",
+    "name": "Vanguard Total Stock Market Index Fund Investor Shares",
+    "ticker": "VTSMX",
+    "expenseRatio": null,
+    "note": "Investor share class. It supplies the annual series, and also the monthly series before 2021-10. Its expense ratio is not sourced to this build’s standard, so it is not stated."
+   },
+   {
+    "series": "INTL_TOTAL",
+    "basis": "annual",
+    "name": "Vanguard Total International Stock Index Fund Investor Shares",
+    "ticker": "VGTSX",
+    "expenseRatio": null,
+    "note": "Investor share class. It supplies the annual series, and also the monthly series before 2021-10. Its expense ratio is not sourced to this build’s standard, so it is not stated."
+   },
+   {
+    "series": "BOND_TOTAL",
+    "basis": "annual",
+    "name": "Vanguard Total Bond Market Index Fund Investor Shares",
+    "ticker": "VBMFX",
+    "expenseRatio": null,
+    "note": "Investor share class. It supplies the annual series, and also the monthly series before 2021-10. Its expense ratio is not sourced to this build’s standard, so it is not stated."
+   }
+  ],
+  "suggestedYears": [
+   2025,
+   2030,
+   2035,
+   2040,
+   2045,
+   2050,
+   2055,
+   2060,
+   2065,
+   2070
+  ],
+  "_suggestedYearsNote": "A picker list, not a limit. Any whole year works; the glide path is continuous in years-to-target and the five-year spacing is the fund industry's convention, not a property of the maths. A user who states 2037 gets 2037.",
+  "preferReal": {
+   "TARGET_2060": "2060"
+  },
+  "_preferRealNote": "Where a REAL fund's series exists for the stated year, offer it and prefer it: it is a record rather than a model, it carries the fund's actual 0.08% cost and its actual sleeves, and it is the only thing the modelled series was ever checked against. Its data starts 2021-10, so selecting it moves the supported window forward by seventeen years and can make a history un-analysable that the modelled reference would have handled. The right shape is therefore both, not either: offer the real one first for 2060, fall back to the modelled one when the history reaches back past 2021-10, and where both are available for the same window showing the two together is a fair thing to do - the gap between them IS the model's error, made visible.",
+  "_costsNote": "data/target-date-costs.json carries published expense ratios for twenty-six real target-date share classes across ten providers, so a user who knows WHO their plan is with but not what it costs can pick a figure instead of guessing. Route the chosen figure through extraDrag(def, pct) into PortfolioInput.expenseRatios[id]. It is NOT PortfolioInput.feePct - that is the fee on the USER'S own portfolio and it drives a different finding."
+ }
 }
