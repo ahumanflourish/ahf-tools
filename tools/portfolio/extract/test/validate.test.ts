@@ -14,7 +14,12 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { crossCheck, recomputeSummary, toInputRows } from '../src/validate';
+import {
+  crossCheck,
+  normaliseAmounts,
+  recomputeSummary,
+  toInputRows,
+} from '../src/validate';
 import type { ExtractionResult } from '../src/types';
 import { clone, VALID, VALID_EMPTY } from './fixtures';
 
@@ -233,5 +238,103 @@ describe('toInputRows', () => {
     const before = clone(VALID.rows);
     toInputRows(VALID.rows);
     expect(VALID.rows).toEqual(before);
+  });
+});
+
+describe('normaliseAmounts — the one place a model’s number is changed', () => {
+  const withRow = (
+    type: 'balance' | 'contribution' | 'withdrawal',
+    amount: number,
+  ): ExtractionResult => {
+    const r = clone(VALID);
+    r.rows.push({
+      date: '2023-07-14',
+      type,
+      amount,
+      currency: 'USD',
+      amountConfidence: 'read',
+      dateConfidence: 'read',
+      account: 'Brokerage ...4412',
+      source: 'Jul 2023 statement p2',
+      note: '',
+    });
+    return r;
+  };
+
+  it('is a no-op on a clean extraction, and hands back the same object', () => {
+    const out = normaliseAmounts(VALID);
+    expect(out.corrections).toEqual([]);
+    expect(out.warnings).toEqual([]);
+    expect(out.result).toBe(VALID);
+  });
+
+  for (const type of ['withdrawal', 'contribution'] as const) {
+    it(`flips a negative ${type} to its magnitude and keeps the declared type`, () => {
+      const out = normaliseAmounts(withRow(type, -450));
+      const row = out.result.rows.at(-1)!;
+      expect(row.amount).toBe(450);
+      expect(row.type).toBe(type);
+      expect(out.corrections).toEqual([
+        {
+          path: `rows[${out.result.rows.length - 1}]`,
+          where: 'rows',
+          index: out.result.rows.length - 1,
+          type,
+          from: -450,
+          to: 450,
+        },
+      ]);
+    });
+
+    it(`gates compute on a corrected ${type}, because the DIRECTION is unproven`, () => {
+      // The magnitude is certain under every reading; the direction is not.
+      // `error` severity is how the review table refuses to compute until a
+      // person has looked at that one row.
+      const [warning] = normaliseAmounts(withRow(type, -450)).warnings;
+      expect(warning.code).toBe('negative-amount');
+      expect(warning.severity).toBe('error');
+    });
+  }
+
+  it('leaves a negative balance alone — flipping it would invent a number', () => {
+    const out = normaliseAmounts(withRow('balance', -1_000));
+    expect(out.corrections).toEqual([]);
+    expect(out.result.rows.at(-1)!.amount).toBe(-1_000);
+    // crossCheck still blocks on it, by its own rule.
+    expect(
+      crossCheck(out.result, NOW).warnings.find((w) => w.code === 'non-positive-balance')
+        ?.severity,
+    ).toBe('error');
+  });
+
+  it('leaves a zero alone, because zero has no sign and no direction', () => {
+    const out = normaliseAmounts(withRow('contribution', 0));
+    expect(out.corrections).toEqual([]);
+    expect(codes(out.result)).toContain('non-positive-amount');
+    expect(codes(out.result)).not.toContain('negative-amount');
+  });
+
+  it('corrects an exclusion at warning severity — nothing computes from it', () => {
+    const r = clone(VALID);
+    r.excluded[0].amount = -7500;
+    const out = normaliseAmounts(r);
+    expect(out.result.excluded[0].amount).toBe(7500);
+    expect(out.warnings[0].severity).toBe('warning');
+    expect(out.warnings[0].path).toBe('excluded[0]');
+  });
+
+  it('never mutates what it was given', () => {
+    const before = clone(withRow('withdrawal', -450));
+    const input = clone(before);
+    normaliseAmounts(input);
+    expect(input).toEqual(before);
+  });
+
+  it('is what stops a negative withdrawal reaching the engine', () => {
+    // Without it, `toInputRows` hands `-450` to a subtraction and money
+    // leaving becomes money arriving — a silent wrong number, which is the
+    // failure class this whole tool exists to catch.
+    const rows = toInputRows(normaliseAmounts(withRow('withdrawal', -450)).result.rows);
+    expect(rows.every((r) => r.amount > 0)).toBe(true);
   });
 });

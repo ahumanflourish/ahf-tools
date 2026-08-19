@@ -196,6 +196,22 @@ export const INVALID_CASES: InvalidCase[] = [
     },
   },
   {
+    name: 'the transfer type the model reached for in probe batch 2',
+    path: 'rows[0].type',
+    code: 'not-in-enum',
+    mutate: (r) => {
+      r.rows[0].type = 'transfer';
+    },
+  },
+  {
+    name: 'the transfer type on an exclusion, where the reason already says so',
+    path: 'excluded[0].type',
+    code: 'not-in-enum',
+    mutate: (r) => {
+      r.excluded[0].type = 'transfer';
+    },
+  },
+  {
     name: 'a confidence value the legend has no style for',
     path: 'rows[0].amountConfidence',
     code: 'not-in-enum',
@@ -349,4 +365,149 @@ export function messageEnvelope(
     usage: { input_tokens: 4179, output_tokens: 812 },
     ...overrides,
   };
+}
+
+/* ─────────────────────────────────────────────────── streaming fixtures */
+
+/**
+ * An envelope with a thinking block ahead of the text block, which is what the
+ * API returns once `thinking` is enabled.
+ *
+ * The ordering is the point. `content[0]` is NOT the JSON any more, so any
+ * reader that indexes into the array positionally reports a perfectly good
+ * extraction as an empty reply.
+ */
+export function thinkingEnvelope(
+  result: unknown,
+  reasoning = 'The balance column is cumulative (not transactions), so I should not include those.',
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return messageEnvelope(result, {
+    content: [
+      { type: 'thinking', thinking: reasoning, signature: 'sig_test_abc123' },
+      { type: 'text', text: JSON.stringify(result) },
+    ],
+    ...overrides,
+  });
+}
+
+export interface FrameOptions {
+  /** Deltas per content block. More than one exercises the chunk boundary. */
+  chunks?: number;
+  /** Drop `message_stop` — the "connection died at the end" case. */
+  omitMessageStop?: boolean;
+  /** Drop `message_delta` too, so no `stop_reason` ever arrives. */
+  omitMessageDelta?: boolean;
+  /** Emit an `error` event instead of `message_delta`/`message_stop`. */
+  errorEvent?: { type: string; message: string };
+}
+
+const frame = (type: string, payload: Record<string, unknown>): string =>
+  `event: ${type}\ndata: ${JSON.stringify({ type, ...payload })}\n\n`;
+
+const splitInto = (text: string, n: number): string[] => {
+  if (text === '') return [''];
+  const size = Math.max(1, Math.ceil(text.length / n));
+  const out: string[] = [];
+  for (let i = 0; i < text.length; i += size) out.push(text.slice(i, i + size));
+  return out;
+};
+
+/**
+ * Turn a message envelope into the SSE frames the API would have sent for it.
+ *
+ * Written from the event shapes in the Messages API streaming reference, and
+ * deliberately faithful on the two things the module depends on: `model`
+ * appears ONLY in `message_start`, and `stop_reason` appears ONLY in
+ * `message_delta`. A fake that put either in the wrong place would let a
+ * regression in truncation detection pass.
+ */
+export function sseFramesFor(
+  envelope: Record<string, unknown>,
+  opts: FrameOptions = {},
+): string[] {
+  const chunks = opts.chunks ?? 3;
+  const usage = (envelope.usage ?? {}) as Record<string, unknown>;
+  const content = Array.isArray(envelope.content) ? envelope.content : [];
+  const frames: string[] = [];
+
+  frames.push(
+    frame('message_start', {
+      message: {
+        id: envelope.id ?? 'msg_test',
+        type: 'message',
+        role: envelope.role ?? 'assistant',
+        model: envelope.model,
+        content: [],
+        stop_reason: null,
+        stop_sequence: null,
+        usage: {
+          input_tokens: typeof usage.input_tokens === 'number' ? usage.input_tokens : 0,
+          output_tokens: 1,
+        },
+      },
+    }),
+  );
+
+  content.forEach((block: any, index: number) => {
+    const type = block?.type ?? 'text';
+    if (type === 'thinking') {
+      frames.push(
+        frame('content_block_start', {
+          index,
+          content_block: { type: 'thinking', thinking: '' },
+        }),
+      );
+      for (const piece of splitInto(String(block.thinking ?? ''), chunks)) {
+        frames.push(
+          frame('content_block_delta', {
+            index,
+            delta: { type: 'thinking_delta', thinking: piece },
+          }),
+        );
+      }
+      frames.push(
+        frame('content_block_delta', {
+          index,
+          delta: { type: 'signature_delta', signature: block.signature ?? 'sig_test' },
+        }),
+      );
+    } else {
+      frames.push(
+        frame('content_block_start', { index, content_block: { type, text: '' } }),
+      );
+      for (const piece of splitInto(String(block?.text ?? ''), chunks)) {
+        frames.push(
+          frame('content_block_delta', { index, delta: { type: 'text_delta', text: piece } }),
+        );
+      }
+    }
+    frames.push(frame('content_block_stop', { index }));
+  });
+
+  if (opts.errorEvent) {
+    frames.push(frame('error', { error: opts.errorEvent }));
+    return frames;
+  }
+
+  if (!opts.omitMessageDelta) {
+    const details = envelope.stop_details;
+    frames.push(
+      frame('message_delta', {
+        delta: {
+          stop_reason: envelope.stop_reason ?? null,
+          stop_sequence: envelope.stop_sequence ?? null,
+          ...(details ? { stop_details: details } : {}),
+        },
+        usage: {
+          output_tokens:
+            typeof usage.output_tokens === 'number' ? usage.output_tokens : 0,
+        },
+      }),
+    );
+  }
+
+  if (!opts.omitMessageStop) frames.push(frame('message_stop', {}));
+
+  return frames;
 }

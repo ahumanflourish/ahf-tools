@@ -71,6 +71,32 @@ describe('the traps added for the enforced-shape world', () => {
   }
 });
 
+describe('the traps probe batch 2 found in the model’s own raw output', () => {
+  // Both of these were observed in a real reply on 2026-08-19. Neither is a
+  // proxy behaviour; both are the prompt's and the validator's job.
+
+  it('forbids the transfer type the model reached for', () => {
+    expect(prompt).toContain('there is no `transfer` type');
+    expect(prompt).toContain('reason `internal-transfer`');
+  });
+
+  it('says both legs of a transfer keep their own direction', () => {
+    expect(prompt).toContain('both legs keep the type they would have had');
+  });
+
+  it('states the positive-amount contract, which the schema cannot enforce', () => {
+    // `minimum` is dropped silently by the API, so the prompt and the client
+    // validator are the only two places this rule can live.
+    expect(prompt).toContain('amounts carry no sign');
+    expect(prompt).toContain('is a positive number');
+    expect(prompt).toContain('-450.00');
+  });
+
+  it('says WHY a signed amount is dangerous, not just that it is banned', () => {
+    expect(prompt).toContain('states the direction twice');
+  });
+});
+
 describe('what the prompt deliberately no longer says', () => {
   it('spends no words on the output format the schema now enforces', () => {
     // The old prompt named the columns, the column order and the comma rules.
