@@ -657,13 +657,13 @@ svg.chart.is-swap { animation: chart-swap var(--fast) var(--ease); }
 
     <div class="chart-layout">
 
-      <!-- Both controls live here, in a row whose height never changes. What
-           they reveal is rendered at the bottom of the card, where growing
-           costs nothing above it. -->
+      <!-- Every control lives here, in a row whose height never changes. What
+           they reveal, and what they explain themselves with, is rendered
+           lower down the card, where growing costs nothing above it. -->
       <div class="chart-head">
         <div class="chart-actions">
           <button type="button" class="choice" id="scale-toggle" aria-pressed="false" aria-describedby="scale-note">Equal % moves, equal size</button>
-<button type="button" class="choice" id="dq-toggle" aria-expanded="false" aria-controls="dq-panel" hidden>Data notes<span class="count" id="dq-count"></span></button>
+          <button type="button" class="choice" id="dq-toggle" aria-expanded="false" aria-controls="dq-panel" hidden>Data notes<span class="count" id="dq-count"></span></button>
           <button type="button" class="choice" id="table-toggle" aria-pressed="false" aria-controls="table-view">Table view</button>
         </div>
       </div>
@@ -674,7 +674,7 @@ svg.chart.is-swap { animation: chart-swap var(--fast) var(--ease); }
 
       <div class="cautions" id="cautions" role="region" aria-label="Cautions on the strategies currently shown"></div>
 
-<p class="scale-note" id="scale-note"></p>
+      <p class="scale-note" id="scale-note"></p>
 
       <div class="chart-foot" id="chart-foot"></div>
 
