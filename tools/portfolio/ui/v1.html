@@ -1568,15 +1568,18 @@ function logTicks(lo, hi, pxPerLn, minGap) {
      flat or single-observation history — used to end up with a y axis
      carrying no labels whatsoever.
 
-     So place the labels LINEARLY across the window instead. This is not a
-     second scale sneaking in behind the first: the POSITIONS are still the
-     log mapping, computed by the same y() as everything else drawn, and only
-     the choice of which values get a label changes. And over a window this
-     narrow the distinction is invisible anyway — across a 1.35x range the log
-     curve departs from the straight line by about 1.4% of the plot height,
-     and across the 1.02x range of a portfolio that did not move, by under a
-     twentieth of a pixel. Nothing is announced to the reader because nothing
-     the reader can see is different; the axis simply has numbers on it. */
+     So CHOOSE the label values linearly instead — 45,000 and 50,000 across
+     40,000-54,035, the step a person would count in.
+
+     This is not a second scale sneaking in behind the first, and the reason
+     is worth being exact about. Only the CHOICE of values changes. Every one
+     of them is then placed by y(), the same log mapping that places the data,
+     so each gridline sits at its true position and the gaps between them come
+     out unequal exactly as a log axis requires: over 40,000-54,035 the run
+     from 40k to 45k is 159px and the run from 45k to 50k is 142px, and that
+     11% difference is the logarithm, drawn. Nothing is approximated, nothing
+     is announced, and the axis is a log axis throughout — it simply has
+     numbers on it now, which is more than it had before. */
   if (hi / lo < Math.sqrt(10)) return linearTicksIn(lo, hi);
   /* Wider than half a decade, so the powers of ten are in there somewhere.
      If even those were judged too close together, draw them anyway — a
