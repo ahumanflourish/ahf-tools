@@ -66,6 +66,9 @@ export function runFixture(): AnalysisResult {
 export const {
   analyse,
   deriveFindings,
+  // review-table prerequisites: CSV parsing and internal-transfer detection
+  parseRows,
+  findMatchedFlows,
   impliedUsMarketWeight,
   FALLBACK_US_MARKET_WEIGHT,
   REGIONAL_TILT_THRESHOLD,
@@ -87,6 +90,9 @@ export const {
 
 export type {
   InputRow,
+  ParseResult,
+  ParsedRow,
+  MatchedFlow,
   Holding,
   PortfolioInput,
   BenchmarkData,
