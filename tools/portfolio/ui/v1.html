@@ -242,16 +242,6 @@ svg.chart:focus-visible { outline: var(--border-thick) dotted var(--accent); out
   font-variant-numeric: tabular-nums;
   fill: var(--subtle);
 }
-/* The two labels that exist only on the ratio scale, and only to say what the
-   scale is NOT: the caption over the top-left corner and the word under the
-   bottom tick. Both are the micro size, tracked, in the same recessive fill as
-   the ticks — they are axis furniture, not annotation. */
-.axis-caption, .axis-floor-note {
-  font-family: 'Instrument Sans', system-ui, sans-serif;
-  font-size: var(--text-micro); font-weight: 600;
-  text-transform: uppercase; letter-spacing: var(--tracking-micro);
-  fill: var(--subtle);
-}
 .end-value {
   font-family: 'Fraunces', Georgia, serif;
   font-variation-settings: 'WONK' 1, 'SOFT' 100, 'opsz' 24;
@@ -1275,7 +1265,7 @@ function paintFoot() {
     c === 0 ? 'no reference strategy selected' : c + ' reference ' + (c === 1 ? 'strategy' : 'strategies') + ', same cash flows',
     showMoneyIn ? 'contributions & withdrawals stepped from ' + D.flows.length + ' recorded flows, net ' + usd(netIn)
                 : 'contributions & withdrawals are switched off',
-    SC.log ? 'scale: log, from ' + usd(SC.floor) + ' — not $0'
+    SC.log ? 'scale: log'
            : 'scale: dollars from $0',
     'granularity: ' + D.dataQuality.granularity
   ];
@@ -1350,7 +1340,8 @@ function paintFoot() {
    loud rather than hidden. A ratio scale cannot contain $0 — there is no
    number of doublings from zero to anything — so the axis has to start above
    it, and the axis says so in three places: the bottom rule is broken instead
-   of solid, the bottom tick is captioned NOT $0, and a caption over the plot
+   of solid. The axis labels themselves say where the scale starts — a caption
+   repeating that is clutter, so there isn't one
    states the range it actually covers.
 
    It also cannot contain a zero or a negative value at all, which is not a
@@ -1807,7 +1798,7 @@ function render() {
      bottom of the plot and it is solid, which is the whole claim. On the ratio
      scale there is no $0 to draw, so the bottom rule is BROKEN — the
      conventional mark for an axis that does not start where you expect — the
-     bottom tick carries the floor figure, the word under it says NOT $0, and a
+     bottom tick carries the floor figure, which is the whole disclosure needed — a
      caption over the corner gives the range in full. A reader must not be able
      to look at this and think they are seeing a zero baseline. */
   if (SC.log) {
@@ -1818,15 +1809,6 @@ function render() {
     svg.appendChild(S('text', {
       class: 'axis-tick', x: M.left - 12, y: yBase + 4, 'text-anchor': 'end'
     }, compactUsd(yFloor)));
-    svg.appendChild(S('text', {
-      class: 'axis-floor-note', x: M.left - 12, y: yBase + 16, 'text-anchor': 'end'
-    }, 'NOT $0'));
-    svg.appendChild(S('text', {
-      class: 'axis-caption', x: 0, y: 13, 'text-anchor': 'start'
-    }, tiny
-      ? 'AXIS ' + compactUsd(yFloor) + '–' + compactUsd(yMax) + ' · LOG · NOT $0'
-      : 'AXIS ' + compactUsd(yFloor) + ' – ' + compactUsd(yMax) +
-        ' · LOG SCALE · NOT FROM $0'));
   }
 
   /* x ticks — years, at January. Every January gets its mark; the LABELS are
