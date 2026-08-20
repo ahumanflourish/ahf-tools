@@ -272,17 +272,23 @@ export function targetDateStrategy(
   }
   const newest = table.schedules[table.schedules.length - 1];
   const asOfMonth = newest.asOf.slice(0, 7);
+  // Every `{year}`, not the first one. `String.replace` with a string pattern
+  // substitutes a single occurrence, and both `explainer` and `caution` name
+  // the year twice — so until the tool grew a field to type a retirement year
+  // into, nothing rendered these strings and nothing caught it. The literal
+  // text "{year}" reached the screen the first time one was offered.
+  const year = (t: string) => t.replace(/\{year\}/g, String(retirementYear));
   return {
     id: `${template.idPrefix}${retirementYear}`,
-    label: template.labelTemplate.replace('{year}', String(retirementYear)),
+    label: year(template.labelTemplate),
     weights: glideWeights(retirementYear, asOfMonth, table),
     weightsAt: (monthKey) => glideWeights(retirementYear, monthKey, table),
     expenseRatio: template.expenseRatio,
     funds: template.funds,
     rebalance: 'monthly',
-    explainer: template.explainer.replace('{year}', String(retirementYear)),
-    caution: template.caution.replace('{year}', String(retirementYear)),
-    constructed: template.constructed.replace('{year}', String(retirementYear)),
+    explainer: year(template.explainer),
+    caution: year(template.caution),
+    constructed: year(template.constructed),
   };
 }
 
