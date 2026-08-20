@@ -1901,7 +1901,7 @@ function deriveFindings(input, you, ref, capture, marketWeight, periods = {}, no
   if (capture.forgone <= 0) {
     f.push({
       id: "outperformed",
-      severity: "info",
+      severity: "notable",
       title: "Your strategy beat the passive reference",
       detail: `Over this period you finished ahead of the reference strategy. Worth checking whether that came with more risk, and remembering that a few years is a short sample.`
     });
